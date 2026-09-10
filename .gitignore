@@ -1,0 +1,22 @@
+# секреты и локальная конфигурация
+.env
+deploy_2.sh
+mark.py
+
+# артефакты сборки PyInstaller (регенерируются командой сборки, в git не нужны)
+build/
+*.spec
+__pycache__/
+
+# локальные данные/тестовые файлы, не относящиеся к исходникам приложения
+users.db
+my.json
+my.xml
+my_hacked.json
+my_own.json
+t3Rol_data.json
+to_p.txt
+
+# инструменты редактора/сессии — личное, не для публичного репо
+.vscode/
+.claude/
