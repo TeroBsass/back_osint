@@ -232,18 +232,22 @@ def scan_base(name: str = None, hwid: str=None, type:str=None):
             print(f"{Fore.RED}No users found in the database.{Style.RESET_ALL}")
 
 
-def osint_user(name:str=None, hwid:str=None, count:int=None):
+def osint_user(name: str = None, hwid: str = None, count: int = None):
     token = _load_token()
     if not token:
         return None
-        
-    resp = _post("/user/osint", {"hwid": hwid, "name": name, "count": count})
+
+    resp = _post("/user/osint", {"hwid": hwid, "device_token": token, "name": name, "count": count})
     if resp is None:
         return None
-    c, p, d_level = resp.json()
-    # выгода: каждая единица count напрямую добавляет +1 к раскрытию символов пароля
-    hidden_pass = sc.hide_pass(p, d_level + c)
-    print(f"{Fore.GREEN}HIDDEN Password for user {name}: {hidden_pass}{Style.RESET_ALL}")
+
+    if resp.status_code != 200:
+        print(f"{Fore.RED}{resp.json().get('detail', resp.text)}{Style.RESET_ALL}")
+        return None
+
+    data = resp.json()
+    print(f"{Fore.GREEN}HIDDEN Password for user {name}: {data['hidden_password']}{Style.RESET_ALL}")
+    return data
 
 
 def read_messages(hwid: str):

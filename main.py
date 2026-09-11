@@ -22,6 +22,7 @@ API по HTTPS. Идентификация клиента — не голый HW
 
 import os
 import hashlib
+import random
 import secrets
 
 import bcrypt
@@ -98,6 +99,7 @@ class DBUserData(BaseModel):
 
 class OsintData(BaseModel):
     hwid: str
+    device_token: str
     name: str
     count: int
 # ------------------------------------------------------------- внутреннее --
@@ -196,36 +198,56 @@ def scan_all():
 def osint_by_user(req: OsintData):
     conn = db_connect()
     broken = False
-    count = req.count
     try:
+        me = _authenticate(conn, req.hwid, req.device_token)
+        my_n = me["name"]
+
+        count = max(0, min(req.count, 5))
+
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 5000")
-            cur.execute("SELECT name FROM users WHERE hwid=%s", (req.hwid,))
-            row = cur.fetchone()
-            if row:
-                my_n = row  
+
             cur.execute("SELECT password, d_level, tries_th FROM users WHERE name=%s", (req.name,))
             row_2 = cur.fetchone()
-            if row_2:
-                p, d_level, tries_th = row_2
-            # стоимость: ваш d_level растёт ровно на count — чем мощнее скан, тем заметнее вы
+            if row_2 is None:
+                raise HTTPException(status_code=404, detail="User not found.")
+            p, d_level, tries_th = row_2
+
             cur.execute(
-                    "UPDATE users SET d_level = LEAST(d_level + %s, %s) WHERE name=%s",
-                    (count, 5, my_n)
-                )
-            count = count if count != 5 else 4
-            
+                "UPDATE users SET d_level = LEAST(d_level + %s, %s) WHERE name=%s",
+                (count, 5, my_n),
+            )
+
             prefix = tries_th if tries_th else ''
             new_tries_th = f"{prefix}{my_n};"
             cur.execute("UPDATE users SET tries_th=%s WHERE name=%s", (new_tries_th, req.name))
-            
-            conn.commit()
-            return count, p, d_level
+
+        conn.commit()
+
+        hidden_pass = hide_pass(p, d_level + count)
+        return {"count": count, "hidden_password": hidden_pass, "d_level": d_level}
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
         broken = True
         raise db_unavailable()
     finally:
         release_connection(conn, broken=broken)
+
+
+def hide_pass(password, d_level, max_level=5):
+    length = len(password)
+
+    # нормализуем level в диапазон 0.0 - 1.0
+    d_level = max(0, min(d_level, max_level))
+    level_ratio = d_level / max_level if max_level != 0 else 0.0
+
+    reveal_count = round(length * level_ratio)
+    reveal_indices = set(random.sample(range(length), reveal_count)) if reveal_count > 0 else set()
+
+    masked = "".join(
+        char if i in reveal_indices else "#"
+        for i, char in enumerate(password)
+    )
+    return masked
 
 @app.post("/auth/claim")
 def claim(req: ClaimRequest):
