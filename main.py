@@ -96,6 +96,10 @@ class DBUserData(BaseModel):
     hwid: str
     name: str
 
+class OsintData(BaseModel):
+    hwid: str
+    name: str
+    count: int
 # ------------------------------------------------------------- внутреннее --
 
 def _verify_password(stored: str, provided: str) -> bool:
@@ -182,6 +186,41 @@ def scan_all():
                 return res
             else:
                 return None
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        broken = True
+        raise db_unavailable()
+    finally:
+        release_connection(conn, broken=broken)
+
+@app.post("/user/osint")
+def osint_by_user(req: OsintData):
+    conn = db_connect()
+    broken = False
+    count = req.count
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = 5000")
+            cur.execute("SELECT name FROM users WHERE hwid=%s", (req.hwid,))
+            row = cur.fetchone()
+            if row:
+                my_n = row  
+            cur.execute("SELECT password, d_level, tries_th FROM users WHERE name=%s", (req.name,))
+            row_2 = cur.fetchone()
+            if row_2:
+                p, d_level, tries_th = row_2
+            # стоимость: ваш d_level растёт ровно на count — чем мощнее скан, тем заметнее вы
+            cur.execute(
+                    "UPDATE users SET d_level = LEAST(d_level + %s, %s) WHERE name=%s",
+                    (count, 5, my_n)
+                )
+            count = count if count != 5 else 4
+            
+            prefix = tries_th if tries_th else ''
+            new_tries_th = f"{prefix}{my_n};"
+            cur.execute("UPDATE users SET tries_th=%s WHERE name=%s", (new_tries_th, req.name))
+            
+            conn.commit()
+            return count, p, d_level
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
         broken = True
         raise db_unavailable()

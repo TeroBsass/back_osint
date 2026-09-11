@@ -19,6 +19,7 @@ import os
 import getpass
 
 import requests
+from mark import SIMPLE_COMMANDS as sc
 
 from colorama import Fore, Style
 
@@ -213,9 +214,9 @@ def scan_base(name: str = None, hwid: str=None, type:str=None):
             print(f"Name: {name}")
             if name in dict_data:
                 print(f"Password: {res[2]}")
-            print(f"HWID: {mask(res[3]) if name not in dict_data else res[3]}")
-            print(f"Restart: {res[4] if name in dict_data else mask(str(res[4]))}")
-            print(f"Shutdown: {res[5] if name in dict_data else mask(str(res[5]))}")
+            print(f"HWID: {sc.mask(res[3]) if name not in dict_data else res[3]}")
+            print(f"Restart: {res[4] if name in dict_data else sc.mask(str(res[4]))}")
+            print(f"Shutdown: {res[5] if name in dict_data else sc.mask(str(res[5]))}")
             print(f"Dangerous level: {res[7]}")
         else:
             print(f"{Fore.RED}No users found for the given criteria.{Style.RESET_ALL}")
@@ -229,10 +230,20 @@ def scan_base(name: str = None, hwid: str=None, type:str=None):
                 print(f"ID: {user[0]}, Name: {user[1]}")
         else:
             print(f"{Fore.RED}No users found in the database.{Style.RESET_ALL}")
-        
 
-def mask(word):
-    return "#" * len(word)
+
+def osint_user(name:str=None, hwid:str=None, count:int=None):
+    token = _load_token()
+    if not token:
+        return None
+        
+    resp = _post("/user/osint", {"hwid": hwid, "name": name, "count": count})
+    if resp is None:
+        return None
+    c, p, d_level = resp.json()
+    # выгода: каждая единица count напрямую добавляет +1 к раскрытию символов пароля
+    hidden_pass = sc.hide_pass(p, d_level + c)
+    print(f"{Fore.GREEN}HIDDEN Password for user {name}: {hidden_pass}{Style.RESET_ALL}")
 
 
 def read_messages(hwid: str):
