@@ -43,7 +43,7 @@ def _save_token(token: str):
         f.write(token)
 
 
-def _post(path: str, payload: dict, timeout: int = 40):
+def _post(path: str, payload: dict = None, timeout: int = 40):
     try:
         resp = requests.post(f"{API_BASE_URL}{path}", json=payload, timeout=timeout)
     except requests.RequestException as e:
@@ -196,6 +196,30 @@ def update_data(hwid: str, ch="", val=0):
             pass
      
     return None
+
+def scan_base(name: str = None, hwid: str=None, type:str=None):
+    token = _load_token()
+    if not token:
+        print(f"{Fore.RED}Not logged in.{Style.RESET_ALL}")
+        return None
+    if type == "user":
+        resp, dict_data = _post("/db/user", {"hwid": hwid, "name": name})
+        if resp:
+            print(f"{Fore.GREEN}User Information:{Style.RESET_ALL}")
+            print(f"ID: {resp[0]}")
+            print(f"Name: {name}")
+            if name in dict_data:
+                print(f"Password: {resp[2]}")
+            print(f"HWID: {mask(resp[3]) if name not in dict_data else resp[3]}")
+            print(f"Restart: {resp[4] if name in dict_data else mask(resp[4])}")
+            print(f"Shutdown: {resp[5] if name in dict_data else mask(resp[5])}")
+            print(f"Dangerous level: {resp[7]}")
+        else:
+            print(f"{Fore.RED}No users found for the given criteria.{Style.RESET_ALL}")
+
+def mask(word):
+    return "#" * len(word)
+
 
 def read_messages(hwid: str):
     """Забирает и одновременно очищает накопленные сообщения на сервере.

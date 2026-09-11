@@ -92,6 +92,9 @@ class ReadMessagesRequest(BaseModel):
     hwid: str
     device_token: str
 
+class DBUserData(BaseModel):
+    hwid: str
+    name: str
 
 # ------------------------------------------------------------- внутреннее --
 
@@ -259,6 +262,29 @@ def resume(req: ResumeRequest):
         raise db_unavailable()
     finally:
         release_connection(conn, broken=broken)
+
+
+@app.post("/db/user")
+def scan_db(req: DBUserData):
+    conn = db_connect()
+    broken = False
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = 5000")
+            cur.execute("SELECT hacked FROM hacks WHERE hwid=%s", (req.hwid, ))
+            hacked = cur.fetchone()
+            form_hacked = hacked[0].split(";") if hacked and hacked[0] else []
+            dict_data = dict(entry.split("->", 1) for entry in form_hacked if entry)
+            cur.execute("SELECT * FROM users WHERE name=%s", (req.name,))
+            res = cur.fetchone()
+            return res, dict_data
+
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):    
+        broken = True
+        raise db_unavailable()
+    finally:
+        release_connection(conn, broken=broken)
+    
 
 
 @app.post("/chat/send")
