@@ -203,19 +203,33 @@ def scan_base(name: str = None, hwid: str=None, type:str=None):
         print(f"{Fore.RED}Not logged in.{Style.RESET_ALL}")
         return None
     if type == "user":
-        resp, dict_data = _post("/db/user", {"hwid": hwid, "name": name})
-        if resp:
+        resp = _post("/db/user", {"hwid": hwid, "name": name})
+        if not resp:
+            return None
+        res, dict_data = resp.json()
+        if res:
             print(f"{Fore.GREEN}User Information:{Style.RESET_ALL}")
-            print(f"ID: {resp[0]}")
+            print(f"ID: {res[0]}")
             print(f"Name: {name}")
             if name in dict_data:
-                print(f"Password: {resp[2]}")
-            print(f"HWID: {mask(resp[3]) if name not in dict_data else resp[3]}")
-            print(f"Restart: {resp[4] if name in dict_data else mask(resp[4])}")
-            print(f"Shutdown: {resp[5] if name in dict_data else mask(resp[5])}")
-            print(f"Dangerous level: {resp[7]}")
+                print(f"Password: {res[2]}")
+            print(f"HWID: {mask(res[3]) if name not in dict_data else res[3]}")
+            print(f"Restart: {res[4] if name in dict_data else mask(str(res[4]))}")
+            print(f"Shutdown: {res[5] if name in dict_data else mask(str(res[5]))}")
+            print(f"Dangerous level: {res[7]}")
         else:
             print(f"{Fore.RED}No users found for the given criteria.{Style.RESET_ALL}")
+    elif type=="all":
+        resp = _post("/db/all")
+        if not resp:
+            return None
+        res = resp.json()
+        if res:
+            for user in res:
+                print(f"ID: {user[0]}, Name: {user[1]}")
+        else:
+            print(f"{Fore.RED}No users found in the database.{Style.RESET_ALL}")
+        
 
 def mask(word):
     return "#" * len(word)

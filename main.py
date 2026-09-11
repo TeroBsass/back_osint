@@ -169,6 +169,24 @@ def register(req: RegisterRequest):
     finally:
         release_connection(conn, broken=broken)
 
+@app.post("/db/all")
+def scan_all():
+    conn = db_connect()
+    broken = False
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = 5000")
+            cur.execute("SELECT * FROM users")
+            res = cur.fetchall()
+            if res:
+                return res
+            else:
+                return None
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        broken = True
+        raise db_unavailable()
+    finally:
+        release_connection(conn, broken=broken)
 
 @app.post("/auth/claim")
 def claim(req: ClaimRequest):
