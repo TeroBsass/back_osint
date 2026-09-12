@@ -216,9 +216,10 @@ def export_import(hwid:str, type:str, file_name:str=None, data:dict=None):
         else:
             print(f"{Fore.RED}Something went wrog while exporting!!!{Style.RESET_ALL}")
     elif type=="import":
-        resp = _post("/user/export", {"hwid": hwid, "data": data})
+        resp = _post("/user/import", {"hwid": hwid, "data": data})
         if not resp:
-            return None 
+            return None
+         
         print(f"{Fore.GREEN}Importing is done!!!{Style.RESET_ALL}")
 
 def scan_base(name: str = None, hwid: str=None, type:str=None):
@@ -253,6 +254,23 @@ def scan_base(name: str = None, hwid: str=None, type:str=None):
                 print(f"ID: {user[0]}, Name: {user[1]}")
         else:
             print(f"{Fore.RED}No users found in the database.{Style.RESET_ALL}")
+
+def get_hwid_by_pass(hwid:str, name:str, password:str):
+    token = _load_token()
+    if not token:
+        print(f"{Fore.RED}Not logged in.{Style.RESET_ALL}")
+        return None
+    resp = _post("/user/hack", {"hwid": hwid, "name": name, "password": password})
+    if not resp:
+        return None
+    if resp.status_code == 401:
+        print(f"{Fore.RED}Invalid password for user {name}.{Style.RESET_ALL}")
+        return
+    elif resp.status_code == 402:
+        print(f"{Fore.RED}No user found with the given name.{Style.RESET_ALL}")
+        return
+    id = resp.json()
+    print(f"{Fore.GREEN}HWID for user {name}: {id}{Style.RESET_ALL}")
 
 
 def osint_user(name: str = None, hwid: str = None, count: int = None):

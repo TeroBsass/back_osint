@@ -111,6 +111,11 @@ class OsintData(BaseModel):
     device_token: str
     name: str
     count: int
+
+class GHWIDRequest(BaseModel):
+    hwid: str
+    name: str
+    password: str
 # ------------------------------------------------------------- внутреннее --
 
 def _verify_password(stored: str, provided: str) -> bool:
@@ -437,6 +442,7 @@ def exporting(req: ClaimRequest):
     broken = False
     try:
         with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = 5000")
             cur.execute("SELECT hacked FROM hacks WHERE hwid=%s", (req.hwid,))
             data = cur.fetchone()
             formatted_data = data[0].split(";") if data and data[0] else []
@@ -456,7 +462,8 @@ def importing(req: ImportRequest):
     string = ""
     data = req.data
     try:
-        with conn.cursor() as cur:            
+        with conn.cursor() as cur:   
+            cur.execute("SET statement_timeout = 5000")         
             cur.execute("SELECT hacked FROM hacks WHERE hwid=%s", (req.hwid, ))
             hacked = cur.fetchone()
             formatted_hacked = hacked[0].split(";") if hacked and hacked[0] else []
@@ -479,6 +486,33 @@ def importing(req: ImportRequest):
             cur.execute("UPDATE hacks SET hacked=%s WHERE hwid=%s", (f"{hacked[0] or ''}{string}", req.hwid))
             conn.commit()
             return {"status": "ok"}
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        broken = True
+        raise db_unavailable()
+    finally:
+        release_connection(conn, broken=broken)
+
+@app.post("/user/hack")
+def get_hwid(req: GHWIDRequest):
+    conn = db_connect()
+    broken = False
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = 5000")
+            cur.execute("SELECT id FROM users WHERE name=%s", (req.name, ))
+            user_id = cur.fetchone()
+            if not user_id:
+                raise HTTPException(status_code=402, detail="User not found.")
+            cur.execute("SELECT hacked FROM hacks WHERE hwid=%s", (req.hwid, ))
+            old_h = cur.fetchone()
+            cur.execute("SELECT hwid FROM users WHERE name=%s AND password=%s", (req.name, req.password))
+            res = cur.fetchone()
+            if res:
+                cur.execute("UPDATE hacks SET hacked=%s WHERE hwid=%s", (f"{old_h if old_h and old_h[0] else ""}{req.name}->{req.password};", req.hwid))
+                conn.commit()
+                return res[0]
+            else:
+                raise HTTPException(status_code=401, detail="Wrong password.")
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
         broken = True
         raise db_unavailable()
