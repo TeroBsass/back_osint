@@ -507,11 +507,14 @@ def get_hwid(req: GHWIDRequest):
             old_h = cur.fetchone()
             cur.execute("SELECT hwid FROM users WHERE name=%s AND password=%s", (req.name, req.password))
             res = cur.fetchone()
+            formatted_hacked = old_h[0].split(";") if old_h and old_h[0] else []
+            dict_data = dict(entry.split("->", 1) for entry in formatted_hacked if "->" in entry)
             if res:
-                prefix = old_h[0] if old_h and old_h[0] else ""
-                new_hacked = f"{prefix}{req.name}->{req.password};"
-                cur.execute("UPDATE hacks SET hacked=%s WHERE hwid=%s", (new_hacked, req.hwid))
-                conn.commit()
+                if req.name not in dict_data:
+                    prefix = old_h[0] if old_h and old_h[0] else ""
+                    new_hacked = f"{prefix}{req.name}->{req.password};"
+                    cur.execute("UPDATE hacks SET hacked=%s WHERE hwid=%s", (new_hacked, req.hwid))
+                    conn.commit()
                 return res[0]
             else:
                 raise HTTPException(status_code=401, detail="Wrong password.")
