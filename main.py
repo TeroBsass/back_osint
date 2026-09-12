@@ -94,6 +94,10 @@ class LoginRequest(BaseModel):
     password: str
     hwid: str
 
+class ImportRequest(BaseModel):
+    hwid: str
+    data: dict
+
 class ReadMessagesRequest(BaseModel):
     hwid: str
     device_token: str
@@ -421,6 +425,60 @@ def post_data(req: UpdateDataRequest):
                             """)
         conn.commit()
         return {"status": "post"}
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        broken = True
+        raise db_unavailable()
+    finally:
+        release_connection(conn, broken=broken)
+
+@app.post("/user/export")
+def exporting(req: ClaimRequest):
+    conn = db_connect()
+    broken = False
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT hacked FROM hacks WHERE hwid=%s", (req.hwid,))
+            data = cur.fetchone()
+            formatted_data = data[0].split(";") if data and data[0] else []
+            dict_data = dict(entry.split("->", 1) for entry in formatted_data if entry)
+            return dict_data
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        broken = True
+        raise db_unavailable()
+    finally:
+        release_connection(conn, broken=broken)
+
+
+@app.post("/user/import")
+def importing(req: ImportRequest):
+    conn = db_connect()
+    broken = False
+    string = ""
+    data = req.data
+    try:
+        with conn.cursor() as cur:            
+            cur.execute("SELECT hacked FROM hacks WHERE hwid=%s", (req.hwid, ))
+            hacked = cur.fetchone()
+            formatted_hacked = hacked[0].split(";") if hacked and hacked[0] else []
+            dict_data = dict(entry.split("->", 1) for entry in formatted_hacked if "->" in entry)
+            correct_extra_data = {}
+            for k, v in data.items():
+                if k in dict_data:
+                    continue
+                cur.execute("SELECT name FROM users")
+                names = cur.fetchall()
+                if k not in [n[0] for n in names]:
+                    continue
+                cur.execute("SELECT password FROM users WHERE name=%s", (k, ))
+                p = cur.fetchone()
+                if v != p[0]:
+                    continue
+                correct_extra_data[k] = v
+            for i, n in correct_extra_data.items():
+                string += f"{i}->{n};"
+            cur.execute("UPDATE hacks SET hacked=%s WHERE hwid=%s", (f"{hacked[0] or ''}{string}", req.hwid))
+            conn.commit()
+            return {"status": "ok"}
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
         broken = True
         raise db_unavailable()

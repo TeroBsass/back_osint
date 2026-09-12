@@ -15,6 +15,7 @@ device_token хранится не рядом с exe (папка установ�
 поверх той же машины.
 """
 
+import json
 import os
 import getpass
 
@@ -197,6 +198,28 @@ def update_data(hwid: str, ch="", val=None):
             pass
      
     return None
+
+def export_import(hwid:str, type:str, file_name:str=None, data:dict=None):
+    token = _load_token()
+    if not token:
+        print(f"{Fore.RED}Not logged in.{Style.RESET_ALL}")
+        return None
+    if type=="export":
+        resp = _post("/user/export", {"hwid": hwid})
+        if not resp:
+            return None
+        dict_data = resp.json()
+        if dict_data:
+            with open(f"{file_name}.json", "w") as json_f:
+                json.dump(dict_data, json_f)
+            print(f"{Fore.GREEN}{file_name}.json has successfuly created!!!{Style.RESET_ALL}")
+        else:
+            print(f"{Fore.RED}Something went wrog while exporting!!!{Style.RESET_ALL}")
+    elif type=="import":
+        resp = _post("/user/export", {"hwid": hwid, "data": data})
+        if not resp:
+            return None 
+        print(f"{Fore.GREEN}Importing is done!!!{Style.RESET_ALL}")
 
 def scan_base(name: str = None, hwid: str=None, type:str=None):
     token = _load_token()
