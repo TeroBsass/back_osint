@@ -407,7 +407,7 @@ def post_data(req: ChatRequest):
             cur.execute("SET statement_timeout = 5000")
             ch = req.ch
             if ch != "d_level_decr":
-                prompt = "UPDATE users SET" + ch + "=%s WHERE hwid=%s"
+                prompt = "UPDATE users SET " + ch + "=%s WHERE hwid=%s"
                 cur.execute(prompt, (req.val, req.hwid))
             elif ch == "d_level_decr":
                 cur.execute("""

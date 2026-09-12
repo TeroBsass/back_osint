@@ -177,7 +177,7 @@ def get_status(hwid: str):
  
     return None
 
-def update_data(hwid: str, ch="", val=0):
+def update_data(hwid: str, ch="", val=None):
     token = _load_token()
     if not token:
         return None
