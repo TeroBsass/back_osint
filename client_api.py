@@ -21,6 +21,7 @@ import getpass
 
 import requests
 from mark import SIMPLE_COMMANDS as sc
+from mark import DOS as DOS
 
 from colorama import Fore, Style
 
@@ -271,6 +272,28 @@ def get_hwid_by_pass(hwid:str, name:str, password:str):
         return
     id = resp.json()
     print(f"{Fore.GREEN}HWID for user {name}: {id}{Style.RESET_ALL}")
+
+def dos_(hwid:str, act:str):
+    token = _load_token()
+    if not token:
+        print(f"{Fore.RED}Not logged in.{Style.RESET_ALL}")
+        return None
+    resp = _post("/user/dos", {"hwid": hwid})
+    if not resp:
+        return None
+    if resp.status_code == 402:
+        print(f"{Fore.RED}No user found with HWID: {hwid}{Style.RESET_ALL}")
+    acts = {
+        "shutdown": lambda: DOS.shutdown_user(hwid),
+        "restart": lambda: DOS.restart_user(hwid),
+    }
+    print(f"{Fore.GREEN}User found.{Style.RESET_ALL}")
+                   
+                    
+    if act in acts:
+        acts[act]()
+    else:
+        print(f"{Fore.RED}Unknown action: {act}{Style.RESET_ALL}")
 
 
 def osint_user(name: str = None, hwid: str = None, count: int = None):

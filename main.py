@@ -524,6 +524,26 @@ def get_hwid(req: GHWIDRequest):
     finally:
         release_connection(conn, broken=broken)
 
+
+@app.post("/user/dos")
+def dos(req: ClaimRequest):
+    conn = db_connect()
+    broken = False
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = 5000")
+            cur.execute("SELECT * FROM users WHERE hwid=%s", (req.hwid,))
+            res = cur.fetchone()
+            if not res:
+                raise HTTPException(status_code=402, detail="User not found.")
+            return {"status": "ok"}
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        broken = True
+        raise db_unavailable()
+    finally:
+        release_connection(conn, broken=broken)
+
+
 @app.post("/chat/read")
 def chat_read(req: ReadMessagesRequest):
     """Отдаёт сырую строку накопленных сообщений (формат "sender->text;...")
