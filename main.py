@@ -83,6 +83,11 @@ class ChatRequest(BaseModel):
     to_name: str
     text: str
 
+class UpdateDataRequest(BaseModel):
+    hwid: str
+    ch: str
+    val: str | None = None
+
 
 class LoginRequest(BaseModel):
     name: str
@@ -399,7 +404,7 @@ def health():
     return {"status": "ok"}
 
 @app.post("/post/data")
-def post_data(req: ChatRequest):
+def post_data(req: UpdateDataRequest):
     conn = db_connect()
     broken = False
     try:
