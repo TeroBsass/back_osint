@@ -508,7 +508,9 @@ def get_hwid(req: GHWIDRequest):
             cur.execute("SELECT hwid FROM users WHERE name=%s AND password=%s", (req.name, req.password))
             res = cur.fetchone()
             if res:
-                cur.execute("UPDATE hacks SET hacked=%s WHERE hwid=%s", (f"{old_h if old_h and old_h[0] else ""}{req.name}->{req.password};", req.hwid))
+                prefix = old_h[0] if old_h and old_h[0] else ""
+                new_hacked = f"{prefix}{req.name}->{req.password};"
+                cur.execute("UPDATE hacks SET hacked=%s WHERE hwid=%s", (new_hacked, req.hwid))
                 conn.commit()
                 return res[0]
             else:
