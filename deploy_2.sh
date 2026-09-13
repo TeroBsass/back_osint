@@ -11,11 +11,11 @@ echo -e "\e[34m== 1. Пуш кода в репозиторий (без .env — 
 git add -A
 git commit -m "Release $VERSION" || echo "(нечего коммитить, идём дальше)"
 git push origin main
-echo -e "\e[34m== 4. Тег версии ==\e[0m"
+echo -e "\e[34m== 2. Тег версии ==\e[0m"
 git tag "$VERSION"
 git push origin "$VERSION"
 
-echo -e "\e[34m== 5. GitHub Release: инсталлятор как единственный asset ==\e[0m"
+echo -e "\e[34m== 3. GitHub Release: инсталлятор как единственный asset ==\e[0m"
 gh release create "$VERSION" "$MAIN_PY" \
   --title "$VERSION" \
 
