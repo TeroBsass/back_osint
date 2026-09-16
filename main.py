@@ -520,6 +520,7 @@ def gid(req: GIDRequest):
     try:
         me = _authenticate(conn, req.hwid, req.token)
         with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = 5000")
             cur.execute("SELECT id, owner FROM chat WHERE name=%s", (req.name, ))
             res = cur.fetchone()
             if res:
