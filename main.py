@@ -490,8 +490,9 @@ def grouped(req: GroupRequest):
     conn = db_connect()
     broken = False
     true_mems = []
-    me = _authenticate(conn, req.hwid, req.token)
+   
     try:
+        me = _authenticate(conn, req.hwid, req.token)
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 5000")
             for m in req.members:
@@ -512,24 +513,26 @@ def grouped(req: GroupRequest):
 def delete_group(req: UnGroupRequest):
     conn = db_connect()
     broken = False
-    me = _authenticate(conn, req.hwid, req.token)
+    
     try:
+        me = _authenticate(conn, req.hwid, req.token)
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 5000")
             cur.execute("SELECT id FROM chat WHERE name=%s", (req.name, ))
             id_g = cur.fetchone()
-            if not id_g or id_g != req.id:
+            if not id_g or id_g[0] != req.id:
                 raise HTTPException(403, "This group does not exists!!!")
             cur.execute("SELECT owner FROM chat WHERE name=%s AND id=%s", (req.name, req.id))
             owner = cur.fetchone()
             if not owner:
-                raise HTTPException(404, "The group has not woner at all!!!")
-            if owner != me["name"]:
+                raise HTTPException(404, "The group has not owner at all!!!")
+            if owner[0] != me["name"]:
                 raise HTTPException(401, "The user is not owner!!!")
             cur.execute("DELETE FROM chat WHERE name=%s AND id=%s", (req.name, req.id))
             conn.commit()
             return {"delete": "success"}
-    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+    except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+        print(e)
         broken = True
         raise db_unavailable()
     finally:
