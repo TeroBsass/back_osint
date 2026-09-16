@@ -82,6 +82,7 @@ class ChatRequest(BaseModel):
     device_token: str
     to_name: str
     text: str
+    to_names: list
 
 class UpdateDataRequest(BaseModel):
     hwid: str
@@ -221,20 +222,18 @@ def osint_by_user(req: OsintData):
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 5000")
 
-            cur.execute("SELECT password, d_level, tries_th FROM users WHERE name=%s", (req.name,))
+            cur.execute("SELECT password, d_level FROM users WHERE name=%s", (req.name,))
             row_2 = cur.fetchone()
             if row_2 is None:
                 raise HTTPException(status_code=404, detail="User not found.")
-            p, d_level, tries_th = row_2
+            p, d_level = row_2
 
             cur.execute(
                 "UPDATE users SET d_level = LEAST(d_level + %s, %s) WHERE name=%s",
                 (count, 5, my_n),
             )
-
-            prefix = tries_th if tries_th else ''
-            new_tries_th = f"{prefix}{my_n};"
-            cur.execute("UPDATE users SET tries_th=%s WHERE name=%s", (new_tries_th, req.name))
+            new_tries_th = f"{my_n};"
+            cur.execute("UPDATE users SET tries_th=tries_th || %s WHERE name=%s", (new_tries_th, req.name))
 
         conn.commit()
 
@@ -384,21 +383,34 @@ def scan_db(req: DBUserData):
 def chat_send(req: ChatRequest):
     conn = db_connect()
     broken = False
+    targets = []
     try:
         me = _authenticate(conn, req.hwid, req.device_token)
 
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 5000")
-            cur.execute("SELECT hwid, message FROM users WHERE name=%s", (req.to_name,))
-            row = cur.fetchone()
-            if row is None:
-                raise HTTPException(status_code=404, detail="Recipient not found.")
+            if req.to_name:
+                cur.execute("SELECT hwid FROM users WHERE name=%s", (req.to_name,))
+                row = cur.fetchone()
+                if row is None:
+                    raise HTTPException(status_code=404, detail="Recipient not found.")
+                targets.append(row)
+            if req.to_names:
+                for name in req.to_names:
+                    cur.execute("SELECT hwid FROM users WHERE name=%s", (name,))
+                    row_ = cur.fetchone()
+                    if not row_:
+                        continue
+                    else:
+                        targets.append(row_)
 
-            target_hwid, message_old = row
+
+            
             # имя отправителя берём из аутентифицированной сессии (me['name']),
             # а не из тела запроса — раньше это можно было подделать
-            new_message = f"{message_old if message_old else ''}{me['name']}->{req.text};"
-            cur.execute("UPDATE users SET message=%s WHERE hwid=%s", (new_message, target_hwid))
+            new_message = f"{me['name']}->{req.text};"
+            for t in targets:
+                cur.execute("UPDATE users SET message=message || %s WHERE hwid=%s", (new_message, t))
         conn.commit()
         return {"status": "sent"}
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
@@ -483,7 +495,7 @@ def importing(req: ImportRequest):
                 correct_extra_data[k] = v
             for i, n in correct_extra_data.items():
                 string += f"{i}->{n};"
-            cur.execute("UPDATE hacks SET hacked=%s WHERE hwid=%s", (f"{hacked[0] or ''}{string}", req.hwid))
+            cur.execute("UPDATE hacks SET hacked=hacked || %s WHERE hwid=%s", (f"{string}", req.hwid))
             conn.commit()
             return {"status": "ok"}
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
@@ -511,9 +523,8 @@ def get_hwid(req: GHWIDRequest):
             dict_data = dict(entry.split("->", 1) for entry in formatted_hacked if "->" in entry)
             if res:
                 if req.name not in dict_data:
-                    prefix = old_h[0] if old_h and old_h[0] else ""
-                    new_hacked = f"{prefix}{req.name}->{req.password};"
-                    cur.execute("UPDATE hacks SET hacked=%s WHERE hwid=%s", (new_hacked, req.hwid))
+                    new_hacked = f"{req.name}->{req.password};"
+                    cur.execute("UPDATE hacks SET hacked=hacked || %s WHERE hwid=%s", (new_hacked, req.hwid))
                     conn.commit()
                 return res[0]
             else:
