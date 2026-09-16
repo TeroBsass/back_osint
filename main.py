@@ -117,6 +117,13 @@ class GHWIDRequest(BaseModel):
     hwid: str
     name: str
     password: str
+
+class GroupRequest(BaseModel):
+    name: str
+    members: list
+    id_g: int
+    hwid: str
+    token: str
 # ------------------------------------------------------------- внутреннее --
 
 def _verify_password(stored: str, provided: str) -> bool:
@@ -473,7 +480,27 @@ def exporting(req: ClaimRequest):
     finally:
         release_connection(conn, broken=broken)
 
-
+@app.post("/chat/make")
+def grouped(req: GroupRequest):
+    conn = db_connect()
+    broken = False
+    true_mems = []
+    me = _authenticate(conn, req.hwid, req.token)
+    try:
+        with conn.cursor() as cur:
+            for m in req.members:
+                cur.execute("SELECT id FROM users WHERE name=%s", (m, ))
+                id = cur.fetchone()
+                if id:
+                    true_mems.append(m)
+            cur.execute("INSERT INTO chat (name, id, members, owner) VALUES (%s, %s, %s, %s)", (req.name, req.id_g, true_mems, me["name"]))
+            conn.commit()
+        return {"status": "made"}
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        broken = True
+        raise db_unavailable()
+    finally:
+        release_connection(conn, broken=broken)
 @app.post("/user/import")
 def importing(req: ImportRequest):
     conn = db_connect()
