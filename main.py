@@ -384,6 +384,7 @@ def chat_send(req: ChatRequest):
     conn = db_connect()
     broken = False
     targets = []
+    not_found = []
     try:
         me = _authenticate(conn, req.hwid, req.device_token)
 
@@ -394,23 +395,30 @@ def chat_send(req: ChatRequest):
                 row = cur.fetchone()
                 if row:
                     targets.append(row[0])
+                else:
+                    not_found.append(req.to_name)
             if req.to_names:
                 for name in req.to_names:
                     cur.execute("SELECT hwid FROM users WHERE name=%s", (name,))
                     row_ = cur.fetchone()
                     if not row_:
-                        continue
+                        not_found.append(name)
                     else:
                         targets.append(row_[0])
 
+            if not targets:
+                raise HTTPException(status_code=404, detail=f"No such user(s) in database: {', '.join(not_found)}")
 
-            
             # имя отправителя берём из аутентифицированной сессии (me['name']),
             # а не из тела запроса — раньше это можно было подделать
             new_message = f"{me['name']}->{req.text};"
             for t in targets:
                 cur.execute("UPDATE users SET message=message || %s WHERE hwid=%s", (new_message, t))
         conn.commit()
+        # если это была массовая рассылка и часть имён не нашлась - сообщаем,
+        # каких именно нет, чтобы это не выглядело как "отправлено всем"
+        if not_found:
+            return {"status": "sent", "not_found": not_found}
         return {"status": "sent"}
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
         broken = True
