@@ -82,7 +82,7 @@ class ChatRequest(BaseModel):
     device_token: str
     to_name: str
     text: str
-    to_names: list
+    to_names: list | None = None
 
 class UpdateDataRequest(BaseModel):
     hwid: str
@@ -392,9 +392,8 @@ def chat_send(req: ChatRequest):
             if req.to_name:
                 cur.execute("SELECT hwid FROM users WHERE name=%s", (req.to_name,))
                 row = cur.fetchone()
-                if row is None:
-                    raise HTTPException(status_code=404, detail="Recipient not found.")
-                targets.append(row)
+                if row:
+                    targets.append(row)
             if req.to_names:
                 for name in req.to_names:
                     cur.execute("SELECT hwid FROM users WHERE name=%s", (name,))
