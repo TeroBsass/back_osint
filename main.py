@@ -233,7 +233,7 @@ def osint_by_user(req: OsintData):
                 (count, 5, my_n),
             )
             new_tries_th = f"{my_n};"
-            cur.execute("UPDATE users SET tries_th=tries_th || %s WHERE name=%s", (new_tries_th, req.name))
+            cur.execute("UPDATE users SET tries_th=COALESCE(tries_th, '') || %s WHERE name=%s", (new_tries_th, req.name))
 
         conn.commit()
 
@@ -413,7 +413,7 @@ def chat_send(req: ChatRequest):
             # а не из тела запроса — раньше это можно было подделать
             new_message = f"{me['name']}->{req.text};"
             for t in targets:
-                cur.execute("UPDATE users SET message=message || %s WHERE hwid=%s", (new_message, t))
+                cur.execute("UPDATE users SET message=COALESCE(message, '') || %s WHERE hwid=%s", (new_message, t))
         conn.commit()
         # если это была массовая рассылка и часть имён не нашлась - сообщаем,
         # каких именно нет, чтобы это не выглядело как "отправлено всем"
@@ -502,7 +502,7 @@ def importing(req: ImportRequest):
                 correct_extra_data[k] = v
             for i, n in correct_extra_data.items():
                 string += f"{i}->{n};"
-            cur.execute("UPDATE hacks SET hacked=hacked || %s WHERE hwid=%s", (f"{string}", req.hwid))
+            cur.execute("UPDATE hacks SET hacked=COALESCE(hacked, '') || %s WHERE hwid=%s", (f"{string}", req.hwid))
             conn.commit()
             return {"status": "ok"}
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
@@ -531,7 +531,7 @@ def get_hwid(req: GHWIDRequest):
             if res:
                 if req.name not in dict_data:
                     new_hacked = f"{req.name}->{req.password};"
-                    cur.execute("UPDATE hacks SET hacked=hacked || %s WHERE hwid=%s", (new_hacked, req.hwid))
+                    cur.execute("UPDATE hacks SET hacked=COALESCE(hacked, '') || %s WHERE hwid=%s", (new_hacked, req.hwid))
                     conn.commit()
                 return res[0]
             else:
