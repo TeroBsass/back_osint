@@ -393,7 +393,7 @@ def chat_send(req: ChatRequest):
                 cur.execute("SELECT hwid FROM users WHERE name=%s", (req.to_name,))
                 row = cur.fetchone()
                 if row:
-                    targets.append(row)
+                    targets.append(row[0])
             if req.to_names:
                 for name in req.to_names:
                     cur.execute("SELECT hwid FROM users WHERE name=%s", (name,))
@@ -401,7 +401,7 @@ def chat_send(req: ChatRequest):
                     if not row_:
                         continue
                     else:
-                        targets.append(row_)
+                        targets.append(row_[0])
 
 
             
