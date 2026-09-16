@@ -80,7 +80,7 @@ class ResumeRequest(BaseModel):
 class ChatRequest(BaseModel):
     hwid: str
     device_token: str
-    to_name: str
+    to_name: str | None = None
     text: str
     to_names: list | None = None
 
