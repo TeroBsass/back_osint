@@ -129,6 +129,10 @@ class UnGroupRequest(BaseModel):
     id: int
     hwid: str
     token: str
+class GIDRequest(BaseModel):
+    hwid: str
+    name: str
+    token: str
 # ------------------------------------------------------------- внутреннее --
 
 def _verify_password(stored: str, provided: str) -> bool:
@@ -503,6 +507,28 @@ def grouped(req: GroupRequest):
             cur.execute("INSERT INTO chat (name, id, members, owner) VALUES (%s, %s, %s, %s)", (req.name, req.id_g, true_mems, me["name"]))
             conn.commit()
         return {"status": "made"}
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        broken = True
+        raise db_unavailable()
+    finally:
+        release_connection(conn, broken=broken)
+
+@app.post("/chat/gid")
+def gid(req: GIDRequest):
+    conn = db_connect()
+    broken = False
+    try:
+        me = _authenticate(conn, req.hwid, req.token)
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, owner FROM chat WHERE name=%s", (req.name, ))
+            res = cur.fetchone()
+            if res:
+                id, owner = res
+            else:
+                raise HTTPException(404, "There's not the group like that!!!")
+            if owner != me["name"]:
+                raise HTTPException(401, "You are not the owner of this group!!!")
+            return id
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
         broken = True
         raise db_unavailable()
