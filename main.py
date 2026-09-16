@@ -124,6 +124,11 @@ class GroupRequest(BaseModel):
     id_g: int
     hwid: str
     token: str
+class UnGroupRequest(BaseModel):
+    name: str
+    id: int
+    hwid: str
+    token: str
 # ------------------------------------------------------------- внутреннее --
 
 def _verify_password(stored: str, provided: str) -> bool:
@@ -488,6 +493,7 @@ def grouped(req: GroupRequest):
     me = _authenticate(conn, req.hwid, req.token)
     try:
         with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = 5000")
             for m in req.members:
                 cur.execute("SELECT id FROM users WHERE name=%s", (m, ))
                 id = cur.fetchone()
@@ -496,6 +502,33 @@ def grouped(req: GroupRequest):
             cur.execute("INSERT INTO chat (name, id, members, owner) VALUES (%s, %s, %s, %s)", (req.name, req.id_g, true_mems, me["name"]))
             conn.commit()
         return {"status": "made"}
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        broken = True
+        raise db_unavailable()
+    finally:
+        release_connection(conn, broken=broken)
+
+@app.post("/chat/delete")
+def delete_group(req: UnGroupRequest):
+    conn = db_connect()
+    broken = False
+    me = _authenticate(conn, req.hwid, req.token)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = 5000")
+            cur.execute("SELECT id FROM chat WHERE name=%s", (req.name, ))
+            id_g = cur.fetchone()
+            if not id_g or id_g != req.id:
+                raise HTTPException(403, "This group does not exists!!!")
+            cur.execute("SELECT owner FROM chat WHERE name=%s AND id=%s", (req.name, req.id))
+            owner = cur.fetchone()
+            if not owner:
+                raise HTTPException(404, "The group has not woner at all!!!")
+            if owner != me["name"]:
+                raise HTTPException(401, "The user is not owner!!!")
+            cur.execute("DELETE FROM chat WHERE name=%s AND id=%s", (req.name, req.id))
+            conn.commit()
+            return {"delete": "success"}
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
         broken = True
         raise db_unavailable()
