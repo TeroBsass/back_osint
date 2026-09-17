@@ -133,6 +133,12 @@ class GIDRequest(BaseModel):
     hwid: str
     name: str
     token: str
+
+class NRRequest(BaseModel):
+    hwid: str
+    to_name: str
+    type: str
+    token: str
 # ------------------------------------------------------------- внутреннее --
 
 def _verify_password(stored: str, provided: str) -> bool:
@@ -513,6 +519,43 @@ def grouped(req: GroupRequest):
     finally:
         release_connection(conn, broken=broken)
 
+@app.post("/chat/nr")
+def pm(req: NRRequest):
+    conn = db_connect()
+    broken = False
+    try:
+        me = _authenticate(conn, req.hwid, req.token)
+        with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = 5000")
+            if req.type == "pm":
+                cur.execute("SELECT message FROM users WHERE hwid=%s", (req.hwid, ))
+                message = cur.fetchone()
+                if message:
+                    formatted_data = message[0].split(";") if message[0] else []
+                    dict_data = dict(entry.split("->", 1) for entry in formatted_data if entry and entry.split("->", 1)[0] == req.name)
+                else:
+                    dict_data = None
+                
+            else:
+                cur.execute("SELECT members FROM chat WHERE name=%s", (req.name, ))
+                members = cur.fetchone()
+                if me["name"] not in members and members:
+                    raise HTTPException(404, "You are not in this group!!!")
+                elif not members:
+                    raise HTTPException(403, "Group does not exist!!!")
+                cur.execute("SELECT messages FROM chat WHERE name=%s", (req.name, ))
+                messages = cur.fetchone()
+                if messages:
+                    formatted_data = messages[0].split(";") if messages[0] else []
+                    dict_data = dict(entry.split("->", 1) for entry in formatted_data if entry)
+                else:
+                    dict_data = None
+            return dict_data
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        broken = True
+        raise db_unavailable()
+    finally:
+        release_connection(conn, broken=broken)
 @app.post("/chat/gid")
 def gid(req: GIDRequest):
     conn = db_connect()
