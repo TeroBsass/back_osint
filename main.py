@@ -532,17 +532,17 @@ def nr(req: NRRequest):
                 message = cur.fetchone()
                 if message:
                     formatted_data = message[0].split(";") if message[0] else []
-                    dict_data = dict(entry.split("->", 1) for entry in formatted_data if entry and entry.split("->", 1)[0] == req.name)
+                    dict_data = dict(entry.split("->", 1) for entry in formatted_data if entry and entry.split("->", 1)[0] == req.to_name)
                 else:
                     dict_data = None
-                
+
             else:
                 cur.execute("SELECT members FROM chat WHERE name=%s", (req.to_name, ))
                 members = cur.fetchone()
-                if me["name"] not in members and members:
-                    raise HTTPException(404, "You are not in this group!!!")
-                elif not members:
+                if not members:
                     raise HTTPException(403, "Group does not exist!!!")
+                elif me["name"] not in members[0]:
+                    raise HTTPException(404, "You are not in this group!!!")
                 cur.execute("SELECT messages FROM chat WHERE name=%s", (req.to_name, ))
                 messages = cur.fetchone()
                 if messages:
