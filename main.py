@@ -520,7 +520,7 @@ def grouped(req: GroupRequest):
         release_connection(conn, broken=broken)
 
 @app.post("/chat/nr")
-def pm(req: NRRequest):
+def nr(req: NRRequest):
     conn = db_connect()
     broken = False
     try:
@@ -537,13 +537,13 @@ def pm(req: NRRequest):
                     dict_data = None
                 
             else:
-                cur.execute("SELECT members FROM chat WHERE name=%s", (req.name, ))
+                cur.execute("SELECT members FROM chat WHERE name=%s", (req.to_name, ))
                 members = cur.fetchone()
                 if me["name"] not in members and members:
                     raise HTTPException(404, "You are not in this group!!!")
                 elif not members:
                     raise HTTPException(403, "Group does not exist!!!")
-                cur.execute("SELECT messages FROM chat WHERE name=%s", (req.name, ))
+                cur.execute("SELECT messages FROM chat WHERE name=%s", (req.to_name, ))
                 messages = cur.fetchone()
                 if messages:
                     formatted_data = messages[0].split(";") if messages[0] else []
