@@ -530,12 +530,14 @@ def nr(req: NRRequest):
             if req.type == "pm":
                 cur.execute("SELECT message FROM users WHERE hwid=%s", (req.hwid, ))
                 message = cur.fetchone()
-                if message:
-                    formatted_data = message[0].split(";") if message[0] else []
-                    dict_data = dict(entry.split("->", 1) for entry in formatted_data if entry and entry.split("->", 1)[0] == req.to_name)
+                if message and message[0]:
+                    formatted_data = message[0].split(";")
+                    dict_data = [entry.split("->", 1) for entry in formatted_data if entry and entry.split("->", 1)[0] == req.to_name]
+                    remaining = [entry for entry in formatted_data if entry and entry.split("->", 1)[0] != req.to_name]
+                    new_mes = ";".join(remaining) + (";" if remaining else "")
+                    cur.execute("UPDATE users SET message=%s WHERE hwid=%s", (new_mes, req.hwid))
                 else:
                     dict_data = None
-
             else:
                 cur.execute("SELECT members FROM chat WHERE name=%s", (req.to_name, ))
                 members = cur.fetchone()
@@ -545,11 +547,13 @@ def nr(req: NRRequest):
                     raise HTTPException(404, "You are not in this group!!!")
                 cur.execute("SELECT messages FROM chat WHERE name=%s", (req.to_name, ))
                 messages = cur.fetchone()
-                if messages:
-                    formatted_data = messages[0].split(";") if messages[0] else []
-                    dict_data = dict(entry.split("->", 1) for entry in formatted_data if entry)
+                if messages and messages[0]:
+                    formatted_data = messages[0].split(";")
+                    dict_data = [entry.split("->", 1) for entry in formatted_data if entry]
                 else:
                     dict_data = None
+                cur.execute("UPDATE chat SET messages=NULL WHERE name=%s", (req.to_name, ))
+            conn.commit()
             return dict_data
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
         broken = True
