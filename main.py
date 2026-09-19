@@ -136,7 +136,7 @@ class GIDRequest(BaseModel):
 
 class NRRequest(BaseModel):
     hwid: str
-    to_name: str
+    id: int
     type: str
     token: str
 # ------------------------------------------------------------- внутреннее --
@@ -511,6 +511,8 @@ def grouped(req: GroupRequest):
                 if id:
                     true_mems.append(m)
             cur.execute("INSERT INTO chat (name, id, members, owner) VALUES (%s, %s, %s, %s)", (req.name, req.id_g, true_mems, me["name"]))
+            rows = [(req.id_g, name) for name in true_mems]
+            cur.executemany("INSERT INTO status (id, name) VALUES (%s, %s)", (rows))
             conn.commit()
         return {"status": "made"}
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
@@ -539,20 +541,23 @@ def nr(req: NRRequest):
                 else:
                     dict_data = None
             else:
-                cur.execute("SELECT members FROM chat WHERE name=%s", (req.to_name, ))
+                cur.execute("SELECT members FROM chat WHERE id=%s", (req.id, ))
                 members = cur.fetchone()
                 if not members:
                     raise HTTPException(403, "Group does not exist!!!")
                 elif me["name"] not in members[0]:
                     raise HTTPException(404, "You are not in this group!!!")
-                cur.execute("SELECT messages FROM chat WHERE name=%s", (req.to_name, ))
+                cur.execute("SELECT status FROM status WHERE id=%s AND name=%s", (req.id, me["name"]))
+                count_read = cur.fetchone()[0]
+                cur.execute("SELECT messages FROM chat WHERE id=%s", (req.id, ))
                 messages = cur.fetchone()
                 if messages and messages[0]:
-                    formatted_data = messages[0].split(";")
+                    formatted_data = messages[0].split(";")[count_read:]
+                    count_new_read = len(formatted_data)
                     dict_data = [entry.split("->", 1) for entry in formatted_data if entry]
                 else:
                     dict_data = None
-                cur.execute("UPDATE chat SET messages=NULL WHERE name=%s", (req.to_name, ))
+                cur.execute("UPDATE status SET status=%s WHERE id=%s AND name=%s", (count_read + count_new_read, req.id, me["name"]))
             conn.commit()
             return dict_data
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
