@@ -500,7 +500,6 @@ def grouped(req: GroupRequest):
     conn = db_connect()
     broken = False
     true_mems = []
-   
     try:
         me = _authenticate(conn, req.hwid, req.token)
         with conn.cursor() as cur:
