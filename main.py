@@ -24,15 +24,16 @@ import os
 import hashlib
 import random
 import secrets
-
+import asyncio
+import logging
 import bcrypt
 import psycopg2
 import psycopg2.pool
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
+logger = logging.getLogger("cleanup")
 DATABASE_URL = os.environ["DATABASE_URL"]
-
 app = FastAPI(title="Osint Master API")
 
 connection_pool = psycopg2.pool.ThreadedConnectionPool(1, 10, DATABASE_URL, connect_timeout=5)
@@ -449,9 +450,7 @@ def chat_send(req: ChatRequest):
         release_connection(conn, broken=broken)
 
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
+
 
 @app.post("/post/data")
 def post_data(req: UpdateDataRequest):
@@ -730,3 +729,51 @@ def chat_read(req: ReadMessagesRequest):
         release_connection(conn, broken=broken)
 
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+def _run_cleanup():
+    conn = db_connect()
+    broken = False
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = 5000")
+            cur.execute("SELECT id FROM chat")
+            ids = cur.fetchall()
+            for id in ids:
+                cur.execute("SELECT status FROM status WHERE id=%s", (id, ))
+                statuses = cur.fetchall()
+                minimum = min(statuses)
+                if minimum == 0:
+                    logger.info(f"The group with id:{id} has not messages to install.")
+                else:
+                    cur.execute("SELECT messages FROM chat WHERE id=%s", (id, ))
+                    messages = cur.fetchone()
+                    if not messages:
+                        logger.warning(f"Soemthing wrong with message in group with id:{id}")
+                        return
+                    nr_mes = [m for m in messages[0].split(";") if m]
+                    new_mes = ";".join(nr_mes[minimum:]) + ";" if nr_mes[minimum:] else None
+                    cur.execute("UPDATE chat SET messages=%s WHERE id=%s", (new_mes, id))
+                    cur.execute("UPDATE status SET status=status - %s WHERE id=%s", (minimum, id))
+                conn.commit()
+            logger.info("cleaup is over")
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        broken = True
+        logger.warning("cleanup: db unavailable, will retry next cycle")
+    finally:
+        release_connection(conn, broken=broken)
+
+async def _cleanup_loop():
+    while True:
+        try:
+            await asyncio.get_running_loop().run_in_executor(None, _run_cleanup)
+        except Exception:
+            logger.exception("cleanup: unexpected error")
+        await asyncio.sleep(300)
+
+
+@app.on_event("startup")
+async def _start_cleanup_task():
+    asyncio.create_task(_cleanup_loop())
