@@ -742,9 +742,8 @@ def _run_cleanup():
             cur.execute("SELECT id FROM chat")
             ids = cur.fetchall()
             for id in ids:
-                cur.execute("SELECT status FROM status WHERE id=%s", (id, ))
-                statuses = cur.fetchall()
-                minimum = min(statuses)
+                cur.execute("SELECT MIN(status) FROM status WHERE id=%s", (id, ))
+                minimum = cur.fetchone()[0]
                 if minimum == 0:
                     logger.info(f"The group with id:{id} has not messages to install.")
                 else:
