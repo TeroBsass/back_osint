@@ -140,6 +140,10 @@ class NRRequest(BaseModel):
     id: int
     type: str
     token: str
+class PMRequest(BaseModel):
+    hwid: str
+    name: str
+    check: bool
 # ------------------------------------------------------------- внутреннее --
 
 def _verify_password(stored: str, provided: str) -> bool:
@@ -728,6 +732,45 @@ def chat_read(req: ReadMessagesRequest):
     finally:
         release_connection(conn, broken=broken)
 
+@app.post("/chat/pm")
+def check_pm(req: PMRequest):
+    conn = db_connect()
+    broken = False
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = 5000")
+            cur.execute("SELECT message FROM users WHERE hwid=%s", (req.hwid,))
+            row = cur.fetchone()
+            if not row:
+                return False
+
+            messages = row[0]
+            splitted = [e for e in messages.split(";") if e] if messages else []
+
+            from_name = [
+                entry.split("->", 1)[1]
+                for entry in splitted
+                if "->" in entry and entry.split("->", 1)[0] == req.name
+            ]
+
+            if req.check:
+                return bool(from_name)
+
+            if not from_name:
+                return None
+
+            remaining = [entry for entry in splitted if entry.split("->", 1)[0] != req.name]
+            new_mes = ";".join(remaining) + (";" if remaining else "")
+
+            cur.execute("UPDATE users SET message=%s WHERE hwid=%s", (new_mes, req.hwid))
+            conn.commit()
+            return from_name
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        broken = True
+        raise db_unavailable()
+    finally:
+        release_connection(conn, broken=broken)       
+    
 
 @app.get("/health")
 def health():
