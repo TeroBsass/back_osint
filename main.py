@@ -137,7 +137,8 @@ class GIDRequest(BaseModel):
 
 class NRRequest(BaseModel):
     hwid: str
-    id: int
+    id: int | None = None
+    to_name: str | None = None
     type: str
     token: str
 class PMRequest(BaseModel):
@@ -555,7 +556,7 @@ def nr(req: NRRequest):
                 messages = cur.fetchone()
                 if messages and messages[0]:
                     formatted_data = messages[0].split(";")[count_read:]
-                    count_new_read = len(formatted_data) - 1
+                    count_new_read = len(formatted_data) - 1 if len(formatted_data) != 0 else len(formatted_data)
                     dict_data = [entry.split("->", 1) for entry in formatted_data if entry]
                 else:
                     dict_data = None
