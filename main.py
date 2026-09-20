@@ -32,6 +32,7 @@ import psycopg2.pool
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
+
 logger = logging.getLogger("cleanup")
 DATABASE_URL = os.environ["DATABASE_URL"]
 app = FastAPI(title="Osint Master API")
@@ -89,6 +90,7 @@ class UpdateDataRequest(BaseModel):
     hwid: str
     ch: str
     val: str | None = None
+    table: str
 
 
 class LoginRequest(BaseModel):
@@ -144,6 +146,16 @@ class NRRequest(BaseModel):
 class PMRequest(BaseModel):
     hwid: str
     name: str
+    check: bool
+class GroupSendRequest(BaseModel):
+    hwid: str
+    token: str
+    id: str
+    text: str
+class GroupCheckRequest(BaseModel):
+    hwid: str
+    token: str
+    id: str
     check: bool
 # ------------------------------------------------------------- внутреннее --
 
@@ -466,7 +478,7 @@ def post_data(req: UpdateDataRequest):
             cur.execute("SET statement_timeout = 5000")
             ch = req.ch
             if ch != "d_level_decr":
-                prompt = "UPDATE users SET " + ch + "=%s WHERE hwid=%s"
+                prompt = "UPDATE " + req.table + " SET " + ch + "=%s WHERE hwid=%s"
                 cur.execute(prompt, (req.val, req.hwid))
             elif ch == "d_level_decr":
                 cur.execute("""
@@ -733,6 +745,23 @@ def chat_read(req: ReadMessagesRequest):
     finally:
         release_connection(conn, broken=broken)
 
+@app.post("/chat/group/send")
+def group_send(req: GroupSendRequest):
+    conn = db_connect()
+    broken = False
+    try:
+        me = _authenticate(conn, req.hwid, req.token)
+        with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = 5000")
+            text = f"{me["name"]}->{req.text};"
+            cur.execute("UPDATE chat SET messages=COALESCE(messages, '') || %s WHERE id=%s", (text, req.id))
+            conn.commit()
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        broken = True
+        raise db_unavailable()
+    finally:
+        release_connection(conn, broken=broken)
+
 @app.post("/chat/pm")
 def check_pm(req: PMRequest):
     conn = db_connect()
@@ -766,6 +795,37 @@ def check_pm(req: PMRequest):
             cur.execute("UPDATE users SET message=%s WHERE hwid=%s", (new_mes, req.hwid))
             conn.commit()
             return from_name
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        broken = True
+        raise db_unavailable()
+    finally:
+        release_connection(conn, broken=broken)
+
+@app.post("/chat/group/check")
+def group_check(req: GroupCheckRequest):
+    conn = db_connect()
+    broken = False
+    try:
+        me = _authenticate(conn, req.hwid, req.token)
+        with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = 5000")
+            cur.execute("SELECT messages FROM chat WHERE id=%s", (req.id, ))
+            row = cur.fetchone()
+            if not row:
+                return
+            messages = row[0].split(";")
+            cur.execute("SELECT status FROM status WHERE name=%s AND id=%s", (me["name"], req.id))
+            res = cur.fetchone()
+            if not res:
+                return
+            status = res[0]
+            if len(messages) > status:
+                if req.check:
+                    return bool(messages)
+                else:
+                    return messages[status:]
+            else:
+                return False
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
         broken = True
         raise db_unavailable()
