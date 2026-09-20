@@ -740,24 +740,44 @@ def _run_cleanup():
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 5000")
             cur.execute("SELECT id FROM chat")
-            ids = cur.fetchall()
-            for id in ids:
-                cur.execute("SELECT MIN(status) FROM status WHERE id=%s", (id, ))
-                minimum = cur.fetchone()[0]
-                if minimum == 0:
-                    logger.info(f"The group with id:{id} has not messages to install.")
-                else:
-                    cur.execute("SELECT messages FROM chat WHERE id=%s", (id, ))
-                    messages = cur.fetchone()
+            ids = [row[0] for row in cur.fetchall()]  # fetchall() отдаёт кортежи — распаковываем сразу
+
+            for group_id in ids:
+                try:
+                    cur.execute("SELECT MIN(status) FROM status WHERE id=%s", (group_id,))
+                    minimum = cur.fetchone()[0]
+
+                    # MIN() = NULL значит "под этим id вообще нет строк в status" —
+                    # это НЕ то же самое, что "у всех status=0", и не должно молча
+                    # уходить в ветку с вычитанием (иначе status=status-NULL=NULL
+                    # у всей группы).
+                    if minimum is None:
+                        logger.warning(f"cleanup: group {group_id} has no rows in status, skipping")
+                        continue
+
+                    if minimum == 0:
+                        logger.info(f"The group with id:{group_id} has no messages to install.")
+                        continue
+
+                    cur.execute("SELECT messages FROM chat WHERE id=%s", (group_id,))
+                    row = cur.fetchone()
+                    messages = row[0] if row else None
+
                     if not messages:
-                        logger.warning(f"Soemthing wrong with message in group with id:{id}")
-                        return
-                    nr_mes = [m for m in messages[0].split(";") if m]
+                        logger.warning(f"Something wrong with message in group with id:{group_id}")
+                        continue  # не return — иначе весь цикл по остальным группам оборвётся
+
+                    nr_mes = [m for m in messages.split(";") if m]
                     new_mes = ";".join(nr_mes[minimum:]) + ";" if nr_mes[minimum:] else None
-                    cur.execute("UPDATE chat SET messages=%s WHERE id=%s", (new_mes, id))
-                    cur.execute("UPDATE status SET status=status - %s WHERE id=%s", (minimum, id))
-                conn.commit()
-            logger.info("cleaup is over")
+
+                    cur.execute("UPDATE chat SET messages=%s WHERE id=%s", (new_mes, group_id))
+                    cur.execute("UPDATE status SET status=status - %s WHERE id=%s", (minimum, group_id))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+                    logger.exception(f"cleanup: failed processing group {group_id}, skipping")
+
+        logger.info("cleanup is over")
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
         broken = True
         logger.warning("cleanup: db unavailable, will retry next cycle")
