@@ -753,7 +753,7 @@ def group_send(req: GroupSendRequest):
         me = _authenticate(conn, req.hwid, req.token)
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 5000")
-            text = f"{me["name"]}->{req.text};"
+            text = f"{me['name']}->{req.text};"
             cur.execute("UPDATE chat SET messages=COALESCE(messages, '') || %s WHERE id=%s", (text, req.id))
             conn.commit()
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
