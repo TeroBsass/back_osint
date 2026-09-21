@@ -768,7 +768,7 @@ def group_send(req: GroupSendRequest):
             row = cur.fetchone()
             if not row:
                 raise HTTPException(403, "Group does not exist!!!")
-            if me["name"] not in row[0].split(";"):
+            if me["name"] not in row:
                 raise HTTPException(404, "You are not in this group!!!")
 
             text = f"{me['name']}->{req.text};"
