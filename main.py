@@ -158,6 +158,11 @@ class GroupCheckRequest(BaseModel):
     token: str
     id: str
     check: bool
+class AddMemRequest(BaseModel):
+    hwid: str
+    token: str
+    id: int
+    name: str
 # ------------------------------------------------------------- внутреннее --
 
 def _verify_password(stored: str, provided: str) -> bool:
@@ -866,6 +871,76 @@ def group_check(req: GroupCheckRequest):
     finally:
         release_connection(conn, broken=broken)
     
+@app.post("/chat/group/add")
+def add_member(req: AddMemRequest):
+    conn = db_connect()
+    broken = False
+    try:
+        me = _authenticate(conn, req.hwid, req.token)
+        with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = 5000")
+            cur.execute("SELECT hwid FROM usres WHERE name=%s", (req.name, ))
+            h = cur.fetchone()
+            if not h:
+                raise HTTPException(404, "User is not found!!!")
+            cur.execute("SELECT owner FROM chat WHERE id=%s", (req.id, ))
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(403, "The error with owner of the group!!!")
+            if me["name"] != row[0]:
+                raise HTTPException(404, "You are not the owner of the group!!!")
+            cur.execute("SELECT members FROM chat WHERE id=%s", (req.id,))
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(403, "Group does not exist!!!")
+            members = _parse_members(row[0])
+            if req.name not in members:
+                members.append(req.name)
+                new_members = "{" + ",".join(members) + "}"
+                cur.execute("UPDATE chat SET members=%s WHERE id=%s", (new_members, req.id))
+                conn.commit()
+        return {"status": "add"}
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        broken = True
+        raise db_unavailable()
+    finally:
+        release_connection(conn, broken=broken)
+
+@app.post("/chat/group/del")
+def del_member(req: AddMemRequest):
+    conn = db_connect()
+    broken = False
+    try:
+        me = _authenticate(conn, req.hwid, req.token)
+        with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = 5000")
+            cur.execute("SELECT hwid FROM usres WHERE name=%s", (req.name, ))
+            h = cur.fetchone()
+            if not h:
+                raise HTTPException(404, "User is not found!!!")
+            cur.execute("SELECT owner FROM chat WHERE id=%s", (req.id, ))
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException("The error with owner of the group!!!")
+            if me["name"] != row[0]:
+                raise HTTPException("You are not the owner of the group!!!")
+            cur.execute("SELECT members FROM chat WHERE id=%s", (req.id,))
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(403, "Group does not exist!!!")
+
+            members = _parse_members(row[0])
+            if req.name not in members:
+                members.remove(req.name)
+                new_members = "{" + ",".join(members) + "}"
+                cur.execute("UPDATE chat SET members=%s WHERE id=%s", (new_members, req.id))
+                conn.commit()
+        return {"status": "del"}
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        broken = True
+        raise db_unavailable()
+    finally:
+        release_connection(conn, broken=broken)
 
 @app.get("/health")
 def health():
