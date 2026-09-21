@@ -91,6 +91,7 @@ class UpdateDataRequest(BaseModel):
     ch: str
     val: str | None = None
     table: str
+    token: str
 
 
 class LoginRequest(BaseModel):
