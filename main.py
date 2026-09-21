@@ -469,22 +469,32 @@ def chat_send(req: ChatRequest):
 
 
 
+_ALLOWED_UPDATES = {
+    "users": {"restart", "shutdown"},  # только то, что реально нужно клиенту менять самому
+}
+
 @app.post("/post/data")
 def post_data(req: UpdateDataRequest):
     conn = db_connect()
     broken = False
     try:
+        me = _authenticate(conn, req.hwid, req.token)  # без этого запрос был не защищён вообще
+
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 5000")
-            ch = req.ch
-            if ch != "d_level_decr":
-                prompt = "UPDATE " + req.table + " SET " + ch + "=%s WHERE hwid=%s"
-                cur.execute(prompt, (req.val, req.hwid))
-            elif ch == "d_level_decr":
-                cur.execute("""
-                                UPDATE users
-                                SET d_level = GREATEST(d_level - 1, 0)
-                            """)
+
+            if req.ch == "d_level_decr":
+                cur.execute(
+                    "UPDATE users SET d_level = GREATEST(d_level - 1, 0) WHERE hwid=%s",
+                    (req.hwid,),
+                )
+            else:
+                allowed = _ALLOWED_UPDATES.get(req.table, set())
+                if req.ch not in allowed:
+                    raise HTTPException(400, "Invalid field.")
+                query = f"UPDATE {req.table} SET {req.ch}=%s WHERE hwid=%s"
+                cur.execute(query, (req.val, req.hwid))
+
         conn.commit()
         return {"status": "post"}
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
@@ -753,9 +763,18 @@ def group_send(req: GroupSendRequest):
         me = _authenticate(conn, req.hwid, req.token)
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 5000")
+
+            cur.execute("SELECT members FROM chat WHERE id=%s", (req.id,))
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(403, "Group does not exist!!!")
+            if me["name"] not in row[0].split(";"):
+                raise HTTPException(404, "You are not in this group!!!")
+
             text = f"{me['name']}->{req.text};"
             cur.execute("UPDATE chat SET messages=COALESCE(messages, '') || %s WHERE id=%s", (text, req.id))
             conn.commit()
+            return {"status": "sent"}
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
         broken = True
         raise db_unavailable()
@@ -809,28 +828,35 @@ def group_check(req: GroupCheckRequest):
         me = _authenticate(conn, req.hwid, req.token)
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 5000")
-            cur.execute("SELECT messages FROM chat WHERE id=%s", (req.id, ))
+            cur.execute("SELECT messages FROM chat WHERE id=%s", (req.id,))
             row = cur.fetchone()
             if not row:
                 return
-            messages = row[0].split(";")
+
+            messages = [m for m in row[0].split(";") if m] if row[0] else []
+
             cur.execute("SELECT status FROM status WHERE name=%s AND id=%s", (me["name"], req.id))
             res = cur.fetchone()
             if not res:
                 return
             status = res[0]
+
             if len(messages) > status:
+                new_entries = messages[status:]
                 if req.check:
-                    return bool(messages)
-                else:
-                    return messages[status:]
-            else:
-                return False
+                    return True
+                cur.execute(
+                    "UPDATE status SET status=%s WHERE id=%s AND name=%s",
+                    (status + len(new_entries), req.id, me["name"]),
+                )
+                conn.commit()
+                return new_entries
+            return False
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
         broken = True
         raise db_unavailable()
     finally:
-        release_connection(conn, broken=broken)       
+        release_connection(conn, broken=broken)
     
 
 @app.get("/health")
