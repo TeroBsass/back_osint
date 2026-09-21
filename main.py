@@ -756,6 +756,13 @@ def chat_read(req: ReadMessagesRequest):
     finally:
         release_connection(conn, broken=broken)
 
+def _parse_members(raw: str) -> list:
+    """members хранится как текстовый литерал Postgres-массива вида
+    '{t3Roll,sulovko}' — снимаем фигурные скобки и разбиваем по запятой."""
+    if not raw:
+        return []
+    return raw.strip("{}").split(",")
+
 @app.post("/chat/group/send")
 def group_send(req: GroupSendRequest):
     conn = db_connect()
@@ -769,7 +776,7 @@ def group_send(req: GroupSendRequest):
             row = cur.fetchone()
             if not row:
                 raise HTTPException(403, "Group does not exist!!!")
-            if me["name"] not in row:
+            if me["name"] not in _parse_members(row):
                 raise HTTPException(404, "You are not in this group!!!")
 
             text = f"{me['name']}->{req.text};"
