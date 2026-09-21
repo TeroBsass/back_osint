@@ -880,7 +880,7 @@ def add_member(req: AddMemRequest):
         me = _authenticate(conn, req.hwid, req.token)
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 5000")
-            cur.execute("SELECT hwid FROM usres WHERE name=%s", (req.name, ))
+            cur.execute("SELECT hwid FROM users WHERE name=%s", (req.name, ))
             h = cur.fetchone()
             if not h:
                 raise HTTPException(404, "User is not found!!!")
@@ -915,7 +915,7 @@ def del_member(req: AddMemRequest):
         me = _authenticate(conn, req.hwid, req.token)
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 5000")
-            cur.execute("SELECT hwid FROM usres WHERE name=%s", (req.name, ))
+            cur.execute("SELECT hwid FROM users WHERE name=%s", (req.name, ))
             h = cur.fetchone()
             if not h:
                 raise HTTPException(404, "User is not found!!!")

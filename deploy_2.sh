@@ -1,5 +1,6 @@
 set -euo pipefail
 VERSION="${1:-}"
+NOTES="${2:-Update $VERSION}"
 MAIN_PY="main.py"
 
 if [ ! -f "$MAIN_PY" ]; then
@@ -18,5 +19,6 @@ git push origin "$VERSION"
 echo -e "\e[34m== 3. GitHub Release: инсталлятор как единственный asset ==\e[0m"
 gh release create "$VERSION" "$MAIN_PY" \
   --title "$VERSION" \
+  --notes "$NOTES"
 
 echo -e "\e[32mГотово: код запушен в main, тег $VERSION создан, релиз опубликован.\e[0m"
