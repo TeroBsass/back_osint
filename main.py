@@ -870,6 +870,7 @@ def group_check(req: GroupCheckRequest):
         raise db_unavailable()
     finally:
         release_connection(conn, broken=broken)
+
     
 @app.post("/chat/group/add")
 def add_member(req: AddMemRequest):
