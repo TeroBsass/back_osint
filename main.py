@@ -935,6 +935,7 @@ def del_member(req: AddMemRequest):
                 members.remove(req.name)
                 new_members = "{" + ",".join(members) + "}"
                 cur.execute("UPDATE chat SET members=%s WHERE id=%s", (new_members, req.id))
+                cur.execute("DELETE FROM status WHERE name=%s AND id=%s", (req.name, req.id))
                 conn.commit()
             else:
                 raise HTTPException(404, f"{req.name} is not member of this group!!!")
