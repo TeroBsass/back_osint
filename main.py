@@ -887,13 +887,13 @@ def add_member(req: AddMemRequest):
             cur.execute("SELECT owner FROM chat WHERE id=%s", (req.id, ))
             row = cur.fetchone()
             if not row:
-                raise HTTPException(403, "The error with owner of the group!!!")
+                raise HTTPException(402, "The error with owner of the group!!!")
             if me["name"] != row[0]:
                 raise HTTPException(404, "You are not the owner of the group!!!")
             cur.execute("SELECT members FROM chat WHERE id=%s", (req.id,))
             row = cur.fetchone()
             if not row:
-                raise HTTPException(403, "Group does not exist!!!")
+                raise HTTPException(401, "Group does not exist!!!")
             members = _parse_members(row[0])
             if req.name not in members:
                 members.append(req.name)
@@ -918,24 +918,26 @@ def del_member(req: AddMemRequest):
             cur.execute("SELECT hwid FROM users WHERE name=%s", (req.name, ))
             h = cur.fetchone()
             if not h:
-                raise HTTPException(404, "User is not found!!!")
+                raise HTTPException(402, "User is not found!!!")
             cur.execute("SELECT owner FROM chat WHERE id=%s", (req.id, ))
             row = cur.fetchone()
             if not row:
-                raise HTTPException("The error with owner of the group!!!")
+                raise HTTPException(401, "The error with owner of the group!!!")
             if me["name"] != row[0]:
-                raise HTTPException("You are not the owner of the group!!!")
+                raise HTTPException(404, "You are not the owner of the group!!!")
             cur.execute("SELECT members FROM chat WHERE id=%s", (req.id,))
             row = cur.fetchone()
             if not row:
                 raise HTTPException(403, "Group does not exist!!!")
 
             members = _parse_members(row[0])
-            if req.name not in members:
+            if req.name in members:
                 members.remove(req.name)
                 new_members = "{" + ",".join(members) + "}"
                 cur.execute("UPDATE chat SET members=%s WHERE id=%s", (new_members, req.id))
                 conn.commit()
+            else:
+                raise HTTPException(404, f"{req.name} is not member of this group!!!")
         return {"status": "del"}
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
         broken = True
