@@ -899,6 +899,7 @@ def add_member(req: AddMemRequest):
                 members.append(req.name)
                 new_members = "{" + ",".join(members) + "}"
                 cur.execute("UPDATE chat SET members=%s WHERE id=%s", (new_members, req.id))
+                cur.execute("INSERT INTO status (id, name) VALUES (%s, %s)", (req.id, req.name))
                 conn.commit()
         return {"status": "add"}
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
