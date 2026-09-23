@@ -488,18 +488,11 @@ def post_data(req: UpdateDataRequest):
 
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 5000")
-
-            if req.ch == "d_level_decr":
-                cur.execute(
-                    "UPDATE users SET d_level = GREATEST(d_level - 1, 0) WHERE hwid=%s",
-                    (req.hwid,),
-                )
-            else:
-                allowed = _ALLOWED_UPDATES.get(req.table, set())
-                if req.ch not in allowed:
-                    raise HTTPException(400, "Invalid field.")
-                query = f"UPDATE {req.table} SET {req.ch}=%s WHERE hwid=%s"
-                cur.execute(query, (req.val, req.hwid))
+            allowed = _ALLOWED_UPDATES.get(req.table, set())
+            if req.ch not in allowed:
+                raise HTTPException(400, "Invalid field.")
+            query = f"UPDATE {req.table} SET {req.ch}=%s WHERE hwid=%s"
+            cur.execute(query, (req.val, req.hwid))
 
         conn.commit()
         return {"status": "post"}
@@ -761,6 +754,22 @@ def chat_read(req: ReadMessagesRequest):
     finally:
         release_connection(conn, broken=broken)
 
+@app.post("/get/name")
+def get_name(req: ReadMessagesRequest):
+    conn = db_connect()
+    broken = False
+    try:
+        me = _authenticate(conn, req.hwid, req.device_token)
+        with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = 5000")
+            name = me["name"]
+        return name
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        broken = True
+        raise db_unavailable()
+    finally:
+        release_connection(conn, broken=broken)
+
 def _parse_members(raw: str) -> list:
     """members хранится как текстовый литерал Postgres-массива вида
     '{t3Roll,sulovko}' — снимаем фигурные скобки и разбиваем по запятой."""
@@ -957,6 +966,7 @@ def _run_cleanup():
     try:
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 5000")
+            cur.execute("UPDATE users SET d_level = GREATEST(d_level - 1, 0)")
             cur.execute("SELECT id FROM chat")
             ids = [row[0] for row in cur.fetchall()]  # fetchall() отдаёт кортежи — распаковываем сразу
 
