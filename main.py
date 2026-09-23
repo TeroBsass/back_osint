@@ -580,6 +580,7 @@ def nr(req: NRRequest):
                     count_new_read = len(formatted_data) - 1 if len(formatted_data) != 0 else len(formatted_data)
                     dict_data = [entry.split("->", 1) for entry in formatted_data if entry]
                 else:
+                    count_new_read = 0
                     dict_data = None
                 cur.execute("UPDATE status SET status=%s WHERE id=%s AND name=%s", (count_read + count_new_read, req.id, me["name"]))
             conn.commit()
