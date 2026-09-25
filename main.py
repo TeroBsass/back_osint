@@ -339,6 +339,8 @@ def claim(req: ClaimRequest):
     finally:
         release_connection(conn, broken=broken)
 
+def _is_bcrypt_hash(value: str) -> bool:
+    return value.startswith(("$2a$", "$2b$", "$2y$"))
 
 @app.post("/auth/login")
 def login(req: LoginRequest):
@@ -372,14 +374,22 @@ def login(req: LoginRequest):
                 )
 
             device_token = secrets.token_urlsafe(32)
-            new_password_value = (
-                stored_password if stored_password.startswith("$2")
-                else bcrypt.hashpw(req.password.encode(), bcrypt.gensalt()).decode()
-            )
-            cur.execute(
-                "UPDATE users SET device_token_hash=%s, password=%s WHERE hwid=%s",
-                (hash_token(device_token), new_password_value, req.hwid),
-            )
+
+            if _is_bcrypt_hash(stored_password):
+                cur.execute(
+                    "UPDATE users SET device_token_hash=%s WHERE hwid=%s",
+                    (hash_token(device_token), req.hwid),
+                )
+            else:
+                # тот же случай ленивой миграции, что и в обычном логине —
+                # пароль в открытом виде есть только сейчас, второго шанса
+                # перехешировать его не будет
+                new_hash = bcrypt.hashpw(req.password.encode(), bcrypt.gensalt()).decode()
+                cur.execute(
+                    "UPDATE users SET device_token_hash=%s, password=%s WHERE hwid=%s",
+                    (hash_token(device_token), new_hash, req.hwid),
+                )
+
         conn.commit()
         return {"device_token": device_token}
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
