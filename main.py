@@ -1031,6 +1031,7 @@ def _run_cleanup():
     finally:
         release_connection(conn, broken=broken)
 
+
 async def _cleanup_loop():
     while True:
         try:
@@ -1038,6 +1039,7 @@ async def _cleanup_loop():
         except Exception:
             logger.exception("cleanup: unexpected error")
         await asyncio.sleep(300)
+
 
 
 @app.on_event("startup")
