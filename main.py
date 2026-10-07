@@ -467,7 +467,7 @@ def get_cs(req: ResumeRequest):
             )
             groups = cur.fetchall()
             print(f"DEBUG: {groups}")
-            gps = dict(groups) if groups
+            gps = dict(groups)
             note_2 = None if gps else "No groups found."
 
             return pms, gps, note_1, note_2
