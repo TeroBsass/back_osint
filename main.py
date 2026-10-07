@@ -443,7 +443,7 @@ def scan_db(req: DBUserData):
 
 
 @app.post("/chat/get_chats")
-def get_chats(req: ResumeRequest):
+def get_cs(req: ResumeRequest):
     conn = db_connect()
     broken = False
     try:
@@ -454,14 +454,14 @@ def get_chats(req: ResumeRequest):
                 "SELECT name FROM users WHERE name <> %s ORDER BY name",
                 (me["name"],),
             )
-            pms = [r[0] for r in cur.fetchall()]
+            pms = [r[0] for r in cur.fetchall()] if cur.fetchall() else []
             note_1 = None if pms else "No pms found."
 
             cur.execute(
                 "SELECT name, id FROM chat WHERE %s = ANY(members)",
                 (me["name"],),
             )
-            gps = dict(cur.fetchall())
+            gps = dict(cur.fetchall()) if cur.fetchall() else {}
             note_2 = None if gps else "No groups found."
 
             return pms, gps, note_1, note_2
