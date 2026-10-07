@@ -1,4 +1,4 @@
-set -euo pipefail
+git set -euo pipefail
 VERSION="${1:-}"
 NOTES="${2:-Update $VERSION}"
 MAIN_PY="main.py"
