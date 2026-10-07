@@ -465,8 +465,9 @@ def get_cs(req: ResumeRequest):
                 "SELECT name, id FROM chat WHERE %s = ANY(members::text[])",
                 (me["name"],),
             )
-            print(f"DEBUG: {cur.fetchall()}")
-            gps = dict(cur.fetchall()) if cur.fetchall() else {}
+            groups = cur.fetchall()
+            print(f"DEBUG: {groups}")
+            gps = dict(groups) if groups
             note_2 = None if gps else "No groups found."
 
             return pms, gps, note_1, note_2
