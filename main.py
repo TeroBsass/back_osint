@@ -442,17 +442,16 @@ def scan_db(req: DBUserData):
         release_connection(conn, broken=broken)
 
 
-@app.post("chat/get_chats")
+@app.post("/chat/get_chats")
 def get_chats(req: ResumeRequest):
     conn = db_connect()
     broken = False
-    note_2 = ""
     try:
         me = _authenticate(conn, req.hwid, req.device_token)
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 5000")
             cur.execute(
-                "SELECT name FROM users WHERE hwid IS DISTINCT FROM %s ORDER BY name LIMIT 1",
+                "SELECT name FROM users WHERE hwid IS DISTINCT FROM %s ORDER BY name",
                 (req.hwid,),
             )
             row = cur.fetchall()
