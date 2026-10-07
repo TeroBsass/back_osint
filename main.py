@@ -448,13 +448,17 @@ def get_cs(req: ResumeRequest):
     broken = False
     try:
         me = _authenticate(conn, req.hwid, req.device_token)
+        print("DEBUG me:", repr(me))
+        print("DEBUG me[name]:", repr(me["name"]))
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 5000")
             cur.execute(
                 "SELECT name FROM users WHERE name <> %s ORDER BY name",
                 (me["name"],),
             )
-            pms = [r[0] for r in cur.fetchall()] if cur.fetchall() else []
+            row = cur.fetchall()
+            print("DEBUG row:", row)
+            pms = [r[0] for r in row] if row else []
             note_1 = None if pms else "No pms found."
 
             cur.execute(
