@@ -440,7 +440,37 @@ def scan_db(req: DBUserData):
         raise db_unavailable()
     finally:
         release_connection(conn, broken=broken)
-    
+
+
+@app.post("chat/get_chats")
+def get_chats(req: ResumeRequest):
+    conn = db_connect()
+    broken = False
+    note_2 = ""
+    try:
+        me = _authenticate(conn, req.hwid, req.device_token)
+        with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = 5000")
+            cur.execute(
+                "SELECT name FROM users WHERE hwid IS DISTINCT FROM %s ORDER BY name LIMIT 1",
+                (req.hwid,),
+            )
+            row = cur.fetchall()
+            pms = [r[0] for r in row] if row else None
+            note_1 = None if row else "No pms found."
+            cur.execute(
+                "SELECT name, id FROM chat WHERE %s = ANY(members)",
+                (me["name"],),
+            )
+            groups = cur.fetchall()
+            d_gs = dict(groups) if groups else None
+            note_2 = None if groups else "No groups found."
+            return pms, d_gs, note_1, note_2
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        broken = True
+        raise db_unavailable()
+    finally:
+        release_connection(conn, broken=broken)
 
 
 @app.post("/chat/send")
