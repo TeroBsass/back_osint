@@ -451,20 +451,20 @@ def get_chats(req: ResumeRequest):
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 5000")
             cur.execute(
-                "SELECT name FROM users WHERE hwid IS DISTINCT FROM %s ORDER BY name",
-                (req.hwid,),
+                "SELECT name FROM users WHERE name <> %s ORDER BY name",
+                (me["name"],),
             )
-            row = cur.fetchall()
-            pms = [r[0] for r in row] if row else None
-            note_1 = None if row else "No pms found."
+            pms = [r[0] for r in cur.fetchall()]
+            note_1 = None if pms else "No pms found."
+
             cur.execute(
                 "SELECT name, id FROM chat WHERE %s = ANY(members)",
                 (me["name"],),
             )
-            groups = cur.fetchall()
-            d_gs = dict(groups) if groups else None
-            note_2 = None if groups else "No groups found."
-            return pms, d_gs, note_1, note_2
+            gps = dict(cur.fetchall())
+            note_2 = None if gps else "No groups found."
+
+            return pms, gps, note_1, note_2
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
         broken = True
         raise db_unavailable()
