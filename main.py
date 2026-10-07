@@ -458,7 +458,7 @@ def get_cs(req: ResumeRequest):
             note_1 = None if pms else "No pms found."
 
             cur.execute(
-                "SELECT name, id FROM chat WHERE %s = ANY(members)",
+                "SELECT name, id FROM chat WHERE %s = ANY(string_to_array(members, ','))",
                 (me["name"],),
             )
             gps = dict(cur.fetchall()) if cur.fetchall() else {}
