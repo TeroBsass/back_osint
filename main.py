@@ -406,7 +406,7 @@ def resume(req: ResumeRequest):
     try:
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 5000")
-            cur.execute("SELECT password FROM users WHERE name=%s", (req.hwid,))
+            cur.execute("SELECT password FROM users WHERE hwid=%s", (req.hwid,))
             password = cur.fetchone()[0]
             if not _is_bcrypt_hash(password):
                 h_pass = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
