@@ -529,7 +529,7 @@ def chat_send(req: ChatRequest):
 
 
 _ALLOWED_UPDATES = {
-    "users": {"restart", "shutdown"},  # только то, что реально нужно клиенту менять самому
+    "users": {"restart", "shutdown", "tries_th"},  # только то, что реально нужно клиенту менять самому
 }
 
 @app.post("/post/data")
