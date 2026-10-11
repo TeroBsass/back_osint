@@ -1021,12 +1021,15 @@ def _run_cleanup():
     try:
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 5000")
-            cur.execute("UPDATE users SET d_level = GREATEST(d_level - 1, 0)")
             cur.execute("SELECT id FROM chat")
+
             ids = [row[0] for row in cur.fetchall()]  # fetchall() отдаёт кортежи — распаковываем сразу
 
             for group_id in ids:
                 try:
+                    cur.execute("UPDATE users SET d_level = GREATEST(d_level - 1, 0)")
+                    conn.commit()
+                    logger.info("d_level is decreased.")
                     cur.execute("SELECT MIN(status) FROM status WHERE id=%s", (group_id,))
                     minimum = cur.fetchone()[0]
 
