@@ -89,6 +89,7 @@ class ChatRequest(BaseModel):
 class UpdateDataRequest(BaseModel):
     hwid: str
     ch: str
+    target_hwid: str
     val: str | None = None
     table: str
     token: str
@@ -545,7 +546,7 @@ def post_data(req: UpdateDataRequest):
             if req.ch not in allowed:
                 raise HTTPException(400, "Invalid field.")
             query = f"UPDATE {req.table} SET {req.ch}=%s WHERE hwid=%s"
-            cur.execute(query, (req.val, req.hwid))
+            cur.execute(query, (req.val, req.target_hwid))
 
         conn.commit()
         return {"status": "post"}
