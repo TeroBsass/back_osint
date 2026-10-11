@@ -1026,7 +1026,7 @@ def _run_cleanup():
             ids = [row[0] for row in cur.fetchall()]  # fetchall() отдаёт кортежи — распаковываем сразу
             cur.execute("UPDATE users SET d_level = GREATEST(d_level - 1, 0)")
             conn.commit()
-            logger.info("d_level is decreased.")
+            logger.exception("d_level is decreased.")
             for group_id in ids:
                 try:
 
