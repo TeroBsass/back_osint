@@ -511,9 +511,9 @@ def chat_send(req: ChatRequest):
 
             # имя отправителя берём из аутентифицированной сессии (me['name']),
             # а не из тела запроса — раньше это можно было подделать
-            new_message = f"{me['name']}->{req.text};"
+            new_message = f"{me['name']}->{req.text}"
             for t in targets:
-                id_mes = random.randint(0, 10000000000000000000000)
+                id_mes = random.randint(0, 10**18)
                 chat = f"{req.hwid}:{t}"
                 cur.execute("INSERT INTO messages VALUES (%s, %s, %s)", (id_mes, chat, new_message))
                 cur.execute("UPDATE users SET message=COALESCE(message, '') || %s WHERE hwid=%s", (f"{id_mes};", t))
