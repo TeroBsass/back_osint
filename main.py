@@ -520,7 +520,7 @@ def chat_send(req: ChatRequest):
             # а не из тела запроса — раньше это можно было подделать
 
             for t in targets:
-                cur.execute("INSERT INTO messages VALUES (%s, %s, %s)", (new_message, sender, t))
+                cur.execute("INSERT INTO messages (message, sender, receiver) VALUES (%s, %s, %s)", (new_message, sender, t))
         conn.commit()
         # если это была массовая рассылка и часть имён не нашлась - сообщаем,
         # каких именно нет, чтобы это не выглядело как "отправлено всем"
