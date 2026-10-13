@@ -832,7 +832,6 @@ def chat_read(req: ReadMessagesRequest):
             cur.execute("SET statement_timeout = 5000")
             cur.execute("SELECT mes_id FROM messages WHERE receiver=%s", (me["name"], ))
             ids = cur.fetchall()
-            cur.execute("UPDATE messages SET message=NULL WHERE receiver=%s", (me["name"], ))
         conn.commit()
  
         return {"ids": ids}
