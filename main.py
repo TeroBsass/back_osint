@@ -244,7 +244,7 @@ def scan_all():
     try:
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 5000")
-            cur.execute("SELECT * FROM users")
+            cur.execute("SELECT * FROM users ORDER BY id ASC")
             res = cur.fetchall()
             if res:
                 return res
@@ -513,7 +513,10 @@ def chat_send(req: ChatRequest):
             # а не из тела запроса — раньше это можно было подделать
             new_message = f"{me['name']}->{req.text};"
             for t in targets:
-                cur.execute("UPDATE users SET message=COALESCE(message, '') || %s WHERE hwid=%s", (new_message, t))
+                id_mes = random.randint(0, 10000000000000000000000)
+                chat = f"{req.hwid}:{t}"
+                cur.execute("INSERT INTO messages VALUES (%s, %s, %s)", (id_mes, chat, new_message))
+                cur.execute("UPDATE users SET message=COALESCE(message, '') || %s WHERE hwid=%s", (id_mes, t))
         conn.commit()
         # если это была массовая рассылка и часть имён не нашлась - сообщаем,
         # каких именно нет, чтобы это не выглядело как "отправлено всем"
@@ -555,6 +558,15 @@ def post_data(req: UpdateDataRequest):
         raise db_unavailable()
     finally:
         release_connection(conn, broken=broken)
+
+def get_mes_from_id(cur, id_mes):
+    cur.execute("SET statement_timeout = 5000")
+    cur.execute("SELECT message FROM messages WHERE id_mes=%s", (id_mes,))
+    data = cur.fetchone()
+    if data:
+        return data[0]
+    else:
+        return None
 
 @app.post("/user/export")
 def exporting(req: ClaimRequest):
@@ -795,14 +807,17 @@ def chat_read(req: ReadMessagesRequest):
     try:
         me = _authenticate(conn, req.hwid, req.device_token)
         messages = me["message"]
- 
+
         if messages:
             with conn.cursor() as cur:
                 cur.execute("SET statement_timeout = 5000")
+                ids = messages.split(";")
+                messages = [get_mes_from_id(cur, m) for m in ids if m and get_mes_from_id(cur, m)]
+                d_mes = {i: m for i, m in zip(ids, messages)}
                 cur.execute("UPDATE users SET message=NULL WHERE hwid=%s", (req.hwid,))
             conn.commit()
  
-        return {"messages": messages}
+        return {"messages": d_mes}
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
         broken = True
         raise db_unavailable()
@@ -1026,7 +1041,7 @@ def _run_cleanup():
             ids = [row[0] for row in cur.fetchall()]  # fetchall() отдаёт кортежи — распаковываем сразу
             cur.execute("UPDATE users SET d_level = GREATEST(d_level - 1, 0)")
             conn.commit()
-            logger.exception("d_level is decreased.")
+            logger.exception("cleanup: d_level is decreased.")
             for group_id in ids:
                 try:
 
