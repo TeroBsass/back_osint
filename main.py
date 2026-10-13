@@ -868,7 +868,7 @@ def get_info_by_ids(req: MessagesGetInfoRequest):
         me = _authenticate(conn, req.hwid, req.device_token)
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 5000")
-            cur.execute("SELECT mes_id, sender, message FROM messages WHERE mes_id = ANY(%s) ORDER BY mes_id", req.mes_ids)
+            cur.execute("SELECT mes_id, sender, message FROM messages WHERE mes_id = ANY(%s) AND receiver = %s ORDER BY mes_id", (req.mes_ids, me["name"]))
             rows = cur.fetchall()
         return {
             "messages": [
