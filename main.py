@@ -516,7 +516,7 @@ def chat_send(req: ChatRequest):
                 id_mes = random.randint(0, 10000000000000000000000)
                 chat = f"{req.hwid}:{t}"
                 cur.execute("INSERT INTO messages VALUES (%s, %s, %s)", (id_mes, chat, new_message))
-                cur.execute("UPDATE users SET message=COALESCE(message, '') || %s WHERE hwid=%s", (id_mes, t))
+                cur.execute("UPDATE users SET message=COALESCE(message, '') || %s WHERE hwid=%s", (f"{id_mes};", t))
         conn.commit()
         # если это была массовая рассылка и часть имён не нашлась - сообщаем,
         # каких именно нет, чтобы это не выглядело как "отправлено всем"
