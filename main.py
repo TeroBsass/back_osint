@@ -833,7 +833,7 @@ def chat_read(req: ReadMessagesRequest):
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 5000")
             cur.execute("SELECT mes_id FROM messages WHERE receiver=%s", (me["name"], ))
-            ids = [r[0] for r in cur.fetchall()] if cur.fetchall() else []
+            ids = [r[0] for r in cur.fetchall()]
         conn.commit()
  
         return {"ids": ids}
