@@ -74,7 +74,9 @@ class ClaimRequest(BaseModel):
     hwid: str
 
 class MessagesGetInfoRequest(BaseModel):
-    mes_id: int
+    mes_ids: list
+    hwid: str
+    device_token: str
 
 class MessagesToDeleteRequest(BaseModel):
     mes_ids: list
@@ -831,7 +833,7 @@ def chat_read(req: ReadMessagesRequest):
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 5000")
             cur.execute("SELECT mes_id FROM messages WHERE receiver=%s", (me["name"], ))
-            ids = cur.fetchall()
+            ids = [r[0] for r in cur.fetchall() if cur.fetchall()]
         conn.commit()
  
         return {"ids": ids}
@@ -865,24 +867,33 @@ def _parse_members(raw: str) -> list:
     return raw.strip("{}").split(",")
 
 @app.post("/messages/get")
-def get_info_by_id(req: MessagesGetInfoRequest):
+def get_info_by_ids(req: MessagesGetInfoRequest):
+    if not req.mes_ids:
+        return {"messages": []}
+
     conn = db_connect()
     broken = False
     try:
+        me = _authenticate(conn, req.hwid, req.device_token)
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 5000")
-            cur.execute("SELECT message, sender, receiver FROM messages WHERE mes_id=%s", (req.mes_id, ))
-            row = cur.fetchone()
-            if not row:
-                raise HTTPException(403, "Mes does not exist!!!")
-            message, sender, receiver = row
-        return {"message": message, "sender": sender, "receiver": receiver}
+            cur.execute(
+                "SELECT mes_id, sender, message FROM messages "
+                "WHERE mes_id = ANY(%s)"
+                "ORDER BY mes_id",
+                req.mes_ids,
+            )
+            rows = cur.fetchall()
+        return {
+            "messages": [
+                {"id": r[0], "sender": r[1], "message": r[2]} for r in rows
+            ]
+        }
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
         broken = True
         raise db_unavailable()
     finally:
         release_connection(conn, broken=broken)
-
 @app.post("/chat/group/send")
 def group_send(req: GroupSendRequest):
     conn = db_connect()
