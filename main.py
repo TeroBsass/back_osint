@@ -73,6 +73,11 @@ class ClaimRequest(BaseModel):
     # Разрешаем "забрать" токен ровно один раз для такого hwid.
     hwid: str
 
+class MessagesGetInfoRequest(BaseModel):
+    mes_id: int
+
+class MessagesToDeleteRequest(BaseModel):
+    mes_ids: list
 
 class ResumeRequest(BaseModel):
     hwid: str
@@ -164,6 +169,7 @@ class AddMemRequest(BaseModel):
     token: str
     id: int
     name: str
+
 # ------------------------------------------------------------- внутреннее --
 
 def _verify_password(stored: str, provided: str) -> bool:
@@ -487,14 +493,15 @@ def chat_send(req: ChatRequest):
     not_found = []
     try:
         me = _authenticate(conn, req.hwid, req.device_token)
-
+        sender = me["name"]
+        new_message = req.text
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 5000")
             if req.to_name:
                 cur.execute("SELECT hwid FROM users WHERE name=%s", (req.to_name,))
                 row = cur.fetchone()
                 if row:
-                    targets.append(row[0])
+                    targets.append(req.to_name)
                 else:
                     not_found.append(req.to_name)
             if req.to_names:
@@ -504,19 +511,16 @@ def chat_send(req: ChatRequest):
                     if not row_:
                         not_found.append(name)
                     else:
-                        targets.append(row_[0])
+                        targets.append(name)
 
             if not targets:
                 raise HTTPException(status_code=404, detail=f"No such user(s) in database: {', '.join(not_found)}")
 
             # имя отправителя берём из аутентифицированной сессии (me['name']),
             # а не из тела запроса — раньше это можно было подделать
-            new_message = f"{me['name']}->{req.text}"
+
             for t in targets:
-                id_mes = random.randint(0, 10**18)
-                chat = f"{req.hwid}:{t}"
-                cur.execute("INSERT INTO messages VALUES (%s, %s, %s)", (id_mes, chat, new_message))
-                cur.execute("UPDATE users SET message=COALESCE(message, '') || %s WHERE hwid=%s", (f"{id_mes};", t))
+                cur.execute("INSERT INTO messages VALUES (%s, %s, %s)", (new_message, sender, t))
         conn.commit()
         # если это была массовая рассылка и часть имён не нашлась - сообщаем,
         # каких именно нет, чтобы это не выглядело как "отправлено всем"
@@ -679,6 +683,23 @@ def gid(req: GIDRequest):
     finally:
         release_connection(conn, broken=broken)
 
+@app.post("/messages/del")
+def delete_mes(req: MessagesToDeleteRequest):
+    broken = False
+    conn = db_connect()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = 5000")
+            for id in req.mes_ids:
+                cur.execute("DELETE FROM messages WHERE mes_id=%s", (id, ))
+        conn.commit()
+        return {"status": "deleted"}
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        broken = True
+        raise db_unavailable()
+    finally:
+        release_connection(conn, broken=broken)
+
 @app.post("/chat/delete")
 def delete_group(req: UnGroupRequest):
     conn = db_connect()
@@ -806,18 +827,15 @@ def chat_read(req: ReadMessagesRequest):
     broken = False
     try:
         me = _authenticate(conn, req.hwid, req.device_token)
-        messages = me["message"]
 
-        if messages:
-            with conn.cursor() as cur:
-                cur.execute("SET statement_timeout = 5000")
-                ids = messages.split(";")
-                messages = [get_mes_from_id(cur, m) for m in ids if m and get_mes_from_id(cur, m)]
-                d_mes = {i: m for i, m in zip(ids, messages)}
-                cur.execute("UPDATE users SET message=NULL WHERE hwid=%s", (req.hwid,))
-            conn.commit()
+        with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = 5000")
+            cur.execute("SELECT mes_id FROM messages WHERE receiver=%s", (me["name"], ))
+            ids = cur.fetchall()
+            cur.execute("UPDATE messages SET message=NULL WHERE receiver=%s", (me["name"], ))
+        conn.commit()
  
-        return {"messages": d_mes}
+        return {"ids": ids}
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
         broken = True
         raise db_unavailable()
@@ -846,6 +864,25 @@ def _parse_members(raw: str) -> list:
     if not raw:
         return []
     return raw.strip("{}").split(",")
+
+@app.post("/messages/get")
+def get_info_by_id(req: MessagesGetInfoRequest):
+    conn = db_connect()
+    broken = False
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = 5000")
+            cur.execute("SELECT message, sender, receiver FROM messages WHERE mes_id=%s", (req.mes_id, ))
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(403, "Mes does not exist!!!")
+            message, sender, receiver = row
+        return {"message": message, "sender": sender, "receiver": receiver}
+    except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        broken = True
+        raise db_unavailable()
+    finally:
+        release_connection(conn, broken=broken)
 
 @app.post("/chat/group/send")
 def group_send(req: GroupSendRequest):
