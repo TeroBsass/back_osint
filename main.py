@@ -565,15 +565,6 @@ def post_data(req: UpdateDataRequest):
     finally:
         release_connection(conn, broken=broken)
 
-def get_mes_from_id(cur, id_mes):
-    cur.execute("SET statement_timeout = 5000")
-    cur.execute("SELECT message FROM messages WHERE id_mes=%s", (id_mes,))
-    data = cur.fetchone()
-    if data:
-        return data[0]
-    else:
-        return None
-
 @app.post("/user/export")
 def exporting(req: ClaimRequest):
     conn = db_connect()
@@ -877,12 +868,7 @@ def get_info_by_ids(req: MessagesGetInfoRequest):
         me = _authenticate(conn, req.hwid, req.device_token)
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = 5000")
-            cur.execute(
-                "SELECT mes_id, sender, message FROM messages "
-                "WHERE mes_id = ANY(%s)"
-                "ORDER BY mes_id",
-                req.mes_ids,
-            )
+            cur.execute("SELECT mes_id, sender, message FROM messages WHERE mes_id = ANY(%s) ORDER BY mes_id", req.mes_ids)
             rows = cur.fetchall()
         return {
             "messages": [
