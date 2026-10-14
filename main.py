@@ -735,24 +735,26 @@ def delete_mes(req: MessagesToDeleteRequest):
 def delete_group(req: UnGroupRequest):
     conn = db_connect()
     broken = False
-    
     try:
         me = _authenticate(conn, req.hwid, req.token)
         with conn.cursor() as cur:
-            cur.execute("SET statement_timeout = 5000")
-            cur.execute("SELECT id FROM chat WHERE name=%s", (req.name, ))
-            id_g = cur.fetchone()
-            if not id_g or id_g[0] != req.id:
-                raise HTTPException(403, "This group does not exists!!!")
-            cur.execute("SELECT owner FROM chat WHERE name=%s AND id=%s", (req.name, req.id))
-            owner = cur.fetchone()
-            if not owner:
-                raise HTTPException(404, "The group has not owner at all!!!")
-            if owner[0] != me["name"]:
-                raise HTTPException(401, "The user is not owner!!!")
-            cur.execute("DELETE FROM chat WHERE name=%s AND id=%s", (req.name, req.id))
-            conn.commit()
-            return {"delete": "success"}
+            cur.execute("SET LOCAL statement_timeout = 5000")
+
+            cur.execute(
+                "SELECT owner FROM chat WHERE id=%s AND name=%s FOR UPDATE",
+                (req.id, req.name),
+            )
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(404, "Group does not exist!!!")
+            if row[0] != me["name"]:
+                raise HTTPException(403, "The user is not owner!!!")
+
+            cur.execute("DELETE FROM messages WHERE receiver=%s", (str(req.id),))
+            cur.execute("DELETE FROM status WHERE id=%s", (req.id,))
+            cur.execute("DELETE FROM chat WHERE id=%s AND name=%s", (req.id, req.name))
+        conn.commit()
+        return {"delete": "success"}
     except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
         print(e)
         broken = True
