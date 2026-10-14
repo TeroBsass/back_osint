@@ -213,7 +213,7 @@ def _authenticate(conn, hwid: str, device_token: str) -> dict:
     if row is None:
         raise HTTPException(status_code=404, detail="Not registered.")
 
-    name, token_hash, restart, shutdown, message, d_level, tries_th = row
+    name, token_hash, restart, shutdown, d_level, tries_th = row
 
     if not token_hash or hash_token(device_token) != token_hash:
         raise HTTPException(status_code=401, detail="Invalid device token.")
