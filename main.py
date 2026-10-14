@@ -174,7 +174,23 @@ class AddMemRequest(BaseModel):
     name: str
 
 # ------------------------------------------------------------- внутреннее --
+def _load_group_messages(cur, group_id):
+    """Все сообщения группы по порядку: [(sender, message), ...]."""
+    cur.execute(
+        "SELECT sender, message FROM messages WHERE receiver=%s ORDER BY mes_id",
+        (str(group_id),),
+    )
+    return cur.fetchall()
 
+
+def _require_group_member(cur, group_id, name):
+    """404 если группы нет, 403 если пользователь не участник."""
+    cur.execute("SELECT members FROM chat WHERE id=%s", (group_id,))
+    row = cur.fetchone()
+    if not row:
+        raise HTTPException(404, "Group does not exist!!!")
+    if name not in _parse_members(row[0]):
+        raise HTTPException(403, "You are not in this group!!!")
 def _verify_password(stored: str, provided: str) -> bool:
     try:
         return bcrypt.checkpw(provided.encode(), stored.encode())
@@ -609,6 +625,7 @@ def grouped(req: GroupRequest):
     finally:
         release_connection(conn, broken=broken)
 
+
 @app.post("/chat/nr")
 def nr(req: NRRequest):
     conn = db_connect()
@@ -616,33 +633,48 @@ def nr(req: NRRequest):
     try:
         me = _authenticate(conn, req.hwid, req.token)
         with conn.cursor() as cur:
-            cur.execute("SET statement_timeout = 5000")
+            cur.execute("SET LOCAL statement_timeout = 5000")
+
             if req.type == "pm":
-                cur.execute("SELECT message FROM messages WHERE sender=%s AND receiver=%s", (req.to_name, me["name"]))
-                msgs = [r[0] for r in cur.fetchall()]
-                dict_data = [[req.to_name, msg] for msg in msgs if msg]
-            else:
-                cur.execute("SELECT members FROM chat WHERE id=%s", (req.id, ))
-                members = cur.fetchone()
-                if not members:
-                    raise HTTPException(403, "Group does not exist!!!")
-                elif me["name"] not in members[0]:
-                    raise HTTPException(404, "You are not in this group!!!")
-                cur.execute("SELECT status FROM status WHERE id=%s AND name=%s", (req.id, me["name"]))
-                count_read = cur.fetchone()[0]
-                cur.execute("SELECT message, sender FROM messages WHERE receiver=%s", (str(req.id), ))
-                messages, senders = cur.fetchall()
-                msgs = [r[0] for r in messages][count_read:]
-                senders = [r[0] for r in senders][count_read:]
-                if msgs:
-                    count_new_read = len(msgs) - 1 if len(msgs) != 0 else len(msgs)
-                    dict_data = [[sender, msg] for sender, msg in zip(msgs, senders) if msg and sender]
-                else:
-                    count_new_read = 0
-                    dict_data = None
-                cur.execute("UPDATE status SET status=%s WHERE id=%s AND name=%s", (count_read + count_new_read, req.id, me["name"]))
+                cur.execute(
+                    "SELECT mes_id, message FROM messages "
+                    "WHERE sender=%s AND receiver=%s ORDER BY mes_id",
+                    (req.to_name, me["name"]),
+                )
+                rows = cur.fetchall()
+                dict_data = [[req.to_name, msg] for _, msg in rows if msg]
+                if rows:
+                    # Показали при открытии чата -- значит, прочитано.
+                    # Иначе pm_checker отдаст их второй раз.
+                    ids = [r[0] for r in rows]
+                    cur.execute(
+                        "DELETE FROM messages WHERE mes_id = ANY(%s) AND receiver=%s",
+                        (ids, me["name"]),
+                    )
+                conn.commit()
+                return dict_data or None
+
+            # группа
+            _require_group_member(cur, req.id, me["name"])
+
+            cur.execute(
+                "SELECT status FROM status WHERE id=%s AND name=%s",
+                (req.id, me["name"]),
+            )
+            st = cur.fetchone()
+            if not st:
+                raise HTTPException(403, "You are not in this group!!!")
+            count_read = st[0]
+
+            new_rows = _load_group_messages(cur, req.id)[count_read:]
+            dict_data = [[sender, msg] for sender, msg in new_rows if sender and msg]
+
+            cur.execute(
+                "UPDATE status SET status=%s WHERE id=%s AND name=%s",
+                (count_read + len(new_rows), req.id, me["name"]),
+            )
             conn.commit()
-            return dict_data
+            return dict_data or None
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
         broken = True
         raise db_unavailable()
@@ -806,24 +838,27 @@ def dos(req: ClaimRequest):
 
 @app.post("/chat/read")
 def chat_read(req: ReadMessagesRequest):
-    """Отдаёт сырую строку накопленных сообщений (формат "sender->text;...")
-    и одновременно чистит её в базе — ровно то, что раньше делал клиент
-    напрямую через SELECT + UPDATE message=NULL. Разбор по отправителям,
-    фильтр по имени и задержка между строками — на стороне клиента,
-    серверу об этом знать незачем."""
+    """Отдаёт накопленные личные сообщения и чистит их в базе
+    (ровно то, что обещал докстринг: раньше клиент делал SELECT + очистку)."""
     conn = db_connect()
     broken = False
     try:
         me = _authenticate(conn, req.hwid, req.device_token)
-
         with conn.cursor() as cur:
-            cur.execute("SET statement_timeout = 5000")
-            cur.execute("SELECT mes_id FROM messages WHERE receiver=%s", (me["name"], ))
-            ids = [r[0] for r in cur.fetchall()]
+            cur.execute("SET LOCAL statement_timeout = 5000")
             cur.execute(
-                "SELECT mes_id, sender, message FROM messages WHERE mes_id = ANY(%s) AND receiver = %s ORDER BY mes_id",
-                (ids, me["name"]))
+                "SELECT mes_id, sender, message FROM messages "
+                "WHERE receiver=%s ORDER BY mes_id",
+                (me["name"],),
+            )
             rows = cur.fetchall()
+            if rows:
+                ids = [r[0] for r in rows]
+                # Удаляем только то, что отдали, чтобы не потерять пришедшее между запросами.
+                cur.execute(
+                    "DELETE FROM messages WHERE mes_id = ANY(%s) AND receiver=%s",
+                    (ids, me["name"]),
+                )
         conn.commit()
         return {
             "messages": [
@@ -866,17 +901,14 @@ def group_send(req: GroupSendRequest):
     try:
         me = _authenticate(conn, req.hwid, req.token)
         with conn.cursor() as cur:
-            cur.execute("SET statement_timeout = 5000")
-
-            cur.execute("SELECT members FROM chat WHERE id=%s", (req.id,))
-            row = cur.fetchone()
-            if not row:
-                raise HTTPException(403, "Group does not exist!!!")
-            if me["name"] not in _parse_members(row[0]):
-                raise HTTPException(404, "You are not in this group!!!")
-            cur.execute("INSERT INTO messages (message, sender, receiver) VALUES (%s, %s, %s)", (req.text, me["name"], str(req.id)))
-            conn.commit()
-            return {"status": "sent"}
+            cur.execute("SET LOCAL statement_timeout = 5000")
+            _require_group_member(cur, req.id, me["name"])
+            cur.execute(
+                "INSERT INTO messages (message, sender, receiver) VALUES (%s, %s, %s)",
+                (req.text, me["name"], str(req.id)),
+            )
+        conn.commit()
+        return {"status": "sent"}
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
         broken = True
         raise db_unavailable()
@@ -890,23 +922,31 @@ def check_pm(req: PMRequest):
     try:
         me = _authenticate(conn, req.hwid, req.token)
         with conn.cursor() as cur:
-            cur.execute("SET statement_timeout = 5000")
-            cur.execute("SELECT message, mes_id FROM messages WHERE sneder=%s AND receiver=%s", (req.name, me["name"]))
-            row, row_2 = cur.fetchall()
-            msgs = [r[0] for r in row]
-            ids = [r[0] for r in row_2]
-            if not msgs:
+            cur.execute("SET LOCAL statement_timeout = 5000")
+            cur.execute(
+                "SELECT message, mes_id FROM messages "
+                "WHERE sender=%s AND receiver=%s ORDER BY mes_id",
+                (req.name, me["name"]),
+            )
+            rows = cur.fetchall()
+            if not rows:
                 return False
             if req.check:
-                return bool(msgs)
-            cur.execute("DELETE FROM messages WHERE mes_id = ANY(%s) and receiver=%s", (ids, me["name"]))
-            conn.commit()
-            return msgs
+                return True
+            msgs = [r[0] for r in rows if r[0]]
+            ids = [r[1] for r in rows]
+            cur.execute(
+                "DELETE FROM messages WHERE mes_id = ANY(%s) AND receiver=%s",
+                (ids, me["name"]),
+            )
+        conn.commit()
+        return msgs or False
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
         broken = True
         raise db_unavailable()
     finally:
         release_connection(conn, broken=broken)
+
 
 @app.post("/chat/group/check")
 def group_check(req: GroupCheckRequest):
@@ -915,32 +955,35 @@ def group_check(req: GroupCheckRequest):
     try:
         me = _authenticate(conn, req.hwid, req.token)
         with conn.cursor() as cur:
-            cur.execute("SET statement_timeout = 5000")
-            cur.execute("SELECT message, sender FROM messages WHERE receiver=%s", (req.id,))
-            row, row_2 = cur.fetchall()
-            msgs = [r[0] for r in row]
-            senders = [r[0] for r in row_2]
+            cur.execute("SET LOCAL statement_timeout = 5000")
 
-
-            cur.execute("SELECT status FROM status WHERE name=%s AND id=%s", (me["name"], req.id))
+            cur.execute(
+                "SELECT status FROM status WHERE name=%s AND id=%s",
+                (me["name"], req.id),
+            )
             res = cur.fetchone()
             if not res:
                 return None
             status = res[0]
 
-            if len(msgs) > status:
-                new_entries = msgs[status:]
-                new_senders = senders[status:]
-                if req.check:
-                    return True
-                news = [[sender, msg] for sender, msg in zip(new_senders, new_entries) if sender and msg]
+            if req.check:
+                # Дёшево: только считаем, без выгрузки текстов.
                 cur.execute(
-                    "UPDATE status SET status=%s WHERE id=%s AND name=%s",
-                    (status + len(new_entries), req.id, me["name"]),
+                    "SELECT COUNT(*) FROM messages WHERE receiver=%s", (str(req.id),)
                 )
-                conn.commit()
-                return news
-            return False
+                return cur.fetchone()[0] > status
+
+            new_rows = _load_group_messages(cur, req.id)[status:]
+            if not new_rows:
+                return False
+
+            news = [[sender, msg] for sender, msg in new_rows if sender and msg]
+            cur.execute(
+                "UPDATE status SET status=%s WHERE id=%s AND name=%s",
+                (status + len(new_rows), req.id, me["name"]),
+            )
+        conn.commit()
+        return news or False
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
         broken = True
         raise db_unavailable()
