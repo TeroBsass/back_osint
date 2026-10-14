@@ -604,21 +604,32 @@ def exporting(req: ClaimRequest):
 def grouped(req: GroupRequest):
     conn = db_connect()
     broken = False
-    true_mems = []
     try:
         me = _authenticate(conn, req.hwid, req.token)
         with conn.cursor() as cur:
-            cur.execute("SET statement_timeout = 5000")
-            for m in req.members:
-                cur.execute("SELECT id FROM users WHERE name=%s", (m, ))
-                id = cur.fetchone()
-                if id:
-                    true_mems.append(m)
-            cur.execute("INSERT INTO chat (name, id, members, owner) VALUES (%s, %s, %s, %s)", (req.name, req.id_g, true_mems, me["name"]))
-            rows = [(req.id_g, name) for name in true_mems]
-            cur.executemany("INSERT INTO status (id, name) VALUES (%s, %s)", (rows, ))
-            conn.commit()
+            cur.execute("SET LOCAL statement_timeout = 5000")
+
+            # Один запрос вместо цикла: оставляем только существующих пользователей
+            cur.execute("SELECT name FROM users WHERE name = ANY(%s)", (list(req.members),))
+            existing = {r[0] for r in cur.fetchall()}
+            true_mems = [m for m in dict.fromkeys(req.members) if m in existing]  # без дублей, порядок сохранён
+            if me["name"] not in true_mems:
+                true_mems.insert(0, me["name"])  # создатель всегда в группе
+
+            cur.execute(
+                "INSERT INTO chat (name, id, members, owner) VALUES (%s, %s, %s, %s)",
+                (req.name, req.id_g, true_mems, me["name"]),
+            )
+            rows = [(req.id_g, name, 0) for name in true_mems]
+            cur.executemany(
+                "INSERT INTO status (id, name, status) VALUES (%s, %s, %s)",
+                rows,
+            )
+        conn.commit()
         return {"status": "made"}
+    except psycopg2.IntegrityError:
+        conn.rollback()
+        raise HTTPException(409, "Group with this id already exists!!!")
     except (psycopg2.OperationalError, psycopg2.InterfaceError):
         broken = True
         raise db_unavailable()
