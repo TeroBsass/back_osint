@@ -1111,14 +1111,15 @@ def _run_cleanup():
                         logger.info(f"The group with id:{group_id} has no messages to install.")
                         continue
 
-                    cur.execute("SELECT mes_id FROM messages WHERE receiver=%s", (group_id,))
-                    ids = [row[0] for row in cur.fetchall()]
+                    cur.execute("SELECT mes_id FROM messages WHERE receiver=%s", (str(group_id),))
+                    mes_ids = [row[0] for row in cur.fetchall()]
 
-                    if not ids:
+                    if not mes_ids:
                         logger.warning(f"Something wrong with message in group with id:{group_id}")
                         continue  # не return — иначе весь цикл по остальным группам оборвётся
 
-                    cur.execute("DELETE FROM messages WHERE receiver=%s and mes_id=ANY(%s)", (group_id, ids[:minimum]))
+
+                    cur.execute("DELETE FROM messages WHERE receiver=%s and mes_id=ANY(%s)", (str(group_id), mes_ids[:minimum]))
                     cur.execute("UPDATE status SET status=status - %s WHERE id=%s", (minimum, group_id))
                     conn.commit()
                 except Exception:
