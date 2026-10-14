@@ -204,7 +204,7 @@ def _authenticate(conn, hwid: str, device_token: str) -> dict:
     with conn.cursor() as cur:
         cur.execute("SET statement_timeout = 5000")
         cur.execute(
-            "SELECT name, device_token_hash, restart, shutdown, message, d_level, tries_th "
+            "SELECT name, device_token_hash, restart, shutdown, d_level, tries_th "
             "FROM users WHERE hwid=%s",
             (hwid,),
         )
@@ -222,7 +222,6 @@ def _authenticate(conn, hwid: str, device_token: str) -> dict:
         "name": name,
         "restart": restart,
         "shutdown": shutdown,
-        "message": message,
         "d_level": d_level,
         "tries_th": tries_th,
     }
