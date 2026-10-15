@@ -26,13 +26,16 @@ import random
 import secrets
 import asyncio
 import logging
+from pathlib import Path
+
 import bcrypt
 import psycopg2
 import psycopg2.pool
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from starlette.responses import FileResponse
 
-
+BASE_DIR = Path(__file__).resolve().parent
 logger = logging.getLogger("cleanup")
 DATABASE_URL = os.environ["DATABASE_URL"]
 app = FastAPI(title="Osint Master API")
@@ -1081,6 +1084,14 @@ def del_member(req: AddMemRequest):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+@app.get("/", include_in_schema=False)
+def site():
+    return FileResponse(BASE_DIR / "static" / "trolling-site-en.html")
+
+@app.get("/ru", include_in_schema=False)
+def site_ru():
+    return FileResponse(BASE_DIR / "static" / "trolling-site.html")
 
 def _run_cleanup():
     conn = db_connect()

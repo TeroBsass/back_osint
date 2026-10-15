@@ -1,0 +1,496 @@
+<title>TROLLING</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;900&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+/* Layout: one long black page. A giant two-row title that slides apart on scroll,
+   a rain of hex and protocol glyphs behind everything, torn-edged slabs,
+   a terminal session, and one download block. Single dark look by design. */
+:root {
+  --void: #040805;
+  --panel: #08110b;
+  --line: #17361f;
+  --green: #34ff7e;
+  --green-deep: #0f8a45;
+  --ink: #d3ecdc;
+  --dim: #7a9784;
+  --f-display: 'Unbounded', 'Arial Black', Impact, sans-serif;
+  --f-body: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+  --f-mono: 'JetBrains Mono', Consolas, 'Courier New', monospace;
+  --gutter-l: max(16px, env(safe-area-inset-left, 0px));
+  --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--void);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 17px;
+  line-height: 1.6;
+  overflow-x: clip;
+}
+a { color: inherit; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
+.mono { font-family: var(--f-mono); }
+
+#rain { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; opacity: .5; pointer-events: none; }
+.scan {
+  position: fixed; inset: 0; z-index: 6; pointer-events: none;
+  background:
+    radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.55) 100%),
+    repeating-linear-gradient(0deg, rgba(0,0,0,.22) 0 1px, transparent 1px 3px);
+}
+.prog { position: fixed; top: env(safe-area-inset-top, 0px); left: 0; right: 0; height: 3px; z-index: 7; background: transparent; }
+.prog i { display: block; height: 100%; width: 0; background: var(--green); }
+.page { position: relative; z-index: 1; }
+
+.wrap {
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-left: var(--gutter-l);
+  padding-right: var(--gutter-r);
+}
+.eyebrow {
+  margin: 0 0 1rem;
+  font-family: var(--f-mono);
+  font-size: .78rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--green);
+}
+
+/* ---------- hero ---------- */
+.hero { overflow: clip; padding-block: 1.25rem 3.5rem; }
+.bar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem 1.5rem; font-family: var(--f-mono); font-size: .82rem; letter-spacing: .06em; color: var(--dim); }
+.bar nav { display: flex; flex-wrap: wrap; gap: .25rem 1.25rem; }
+.bar a { text-decoration: none; }
+.bar a:hover { color: var(--green); }
+.bar b { color: var(--green); font-weight: 700; }
+
+.title {
+  margin: clamp(2rem, 7vw, 5rem) 0 0;
+  font-family: var(--f-display);
+  font-weight: 900;
+  font-size: clamp(3rem, 17.5vw, 13rem);
+  line-height: .9;
+  letter-spacing: -.02em;
+  text-transform: uppercase;
+}
+.row {
+  display: flex;
+  overflow: hidden;
+  padding: .05em .05em;
+  width: max-content;
+  max-width: none;
+  will-change: transform;
+}
+.r1 { transform: translateX(calc(var(--p, 0) * -16vw)); }
+.r2 { transform: translateX(calc(var(--p, 0) * 16vw)); margin-left: .55em; }
+.ch { position: relative; display: block; animation: up 1s cubic-bezier(.2, .9, .1, 1) both; animation-delay: calc(var(--i) * 75ms + 150ms); }
+.r1 .ch { --from: 118%; color: var(--green); }
+.r2 .ch { --from: -118%; color: transparent; -webkit-text-stroke: .02em var(--green); }
+@keyframes up { from { transform: translateY(var(--from)) skewX(-16deg); } }
+.ch::before, .ch::after { content: attr(data-c); position: absolute; inset: 0; opacity: 0; pointer-events: none; -webkit-text-stroke: 0; }
+.ch::before { color: var(--green-deep); animation: gl1 6s steps(1, end) infinite; animation-delay: calc(var(--i) * 130ms + 2.6s); }
+.ch::after { color: #eafff1; animation: gl2 6s steps(1, end) infinite; animation-delay: calc(var(--i) * 130ms + 2.65s); }
+@keyframes gl1 {
+  0%, 84%, 100% { opacity: 0; }
+  86% { opacity: 1; transform: translateX(-.06em); clip-path: inset(8% 0 62% 0); }
+  90% { opacity: 1; transform: translateX(.07em); clip-path: inset(52% 0 22% 0); }
+  94% { opacity: 1; transform: translateX(-.03em); clip-path: inset(30% 0 44% 0); }
+  97% { opacity: 0; }
+}
+@keyframes gl2 {
+  0%, 85%, 100% { opacity: 0; }
+  87% { opacity: 1; transform: translateX(.05em); clip-path: inset(60% 0 12% 0); }
+  92% { opacity: 1; transform: translateX(-.06em); clip-path: inset(18% 0 66% 0); }
+  96% { opacity: 0; }
+}
+.cur { display: block; align-self: flex-end; width: .5em; height: .13em; margin: 0 0 .06em .12em; background: var(--green); animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+.hero-foot { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 2rem 3rem; align-items: end; margin-top: clamp(2rem, 5vw, 3.5rem); }
+.lead { margin: 0; max-width: 34ch; font-size: clamp(1.15rem, 2.2vw, 1.5rem); line-height: 1.4; color: var(--ink); }
+.lead .tag { display: block; margin-bottom: .75rem; font-family: var(--f-mono); font-size: .78rem; letter-spacing: .16em; text-transform: uppercase; color: var(--green); }
+.cta { display: flex; flex-direction: column; align-items: flex-start; gap: 1rem; }
+.btn {
+  display: inline-flex; flex-direction: column; gap: .15rem;
+  padding: 1.05rem 1.8rem 1.05rem 1.5rem;
+  background: var(--green); color: #021008;
+  font-family: var(--f-mono); font-weight: 700; font-size: 1.05rem; letter-spacing: .06em; text-transform: uppercase; text-decoration: none;
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+  transition: background .15s, transform .15s;
+}
+.btn small { font-size: .72rem; font-weight: 400; letter-spacing: .08em; opacity: .75; text-transform: none; }
+.btn:hover { background: #eafff1; transform: translate(-3px, -3px); }
+.btn:focus-visible { outline: none; background: #eafff1; box-shadow: inset 0 0 0 3px #021008; }
+.lnk { font-family: var(--f-mono); font-size: .86rem; letter-spacing: .05em; color: var(--dim); text-underline-offset: .25em; }
+.lnk:hover { color: var(--green); }
+
+/* ---------- tape ---------- */
+.tapes { position: relative; overflow: clip; padding-block: 2.5rem 3rem; }
+.tape { width: 112vw; margin-left: -6vw; overflow: hidden; font-family: var(--f-display); font-weight: 900; font-size: clamp(1.1rem, 2.6vw, 1.9rem); text-transform: uppercase; white-space: nowrap; }
+.tape .track { display: flex; width: max-content; animation: slide 34s linear infinite; }
+.tape span { padding: .7em 0; }
+.t1 { background: var(--green); color: #021008; transform: rotate(-1.6deg); }
+.t2 { margin-top: -.4rem; background: var(--void); color: transparent; -webkit-text-stroke: 1px var(--green); border-block: 1px solid var(--green-deep); transform: rotate(1.2deg); }
+.t2 .track { animation-direction: reverse; animation-duration: 46s; }
+@keyframes slide { to { transform: translateX(-50%); } }
+
+/* ---------- slabs (torn edges) ---------- */
+.slab {
+  background: rgba(6, 14, 9, .9);
+  padding-block: 7rem;
+  clip-path: polygon(0 18px, 6% 4px, 13% 22px, 21% 0, 29% 16px, 38% 6px, 47% 24px, 56% 2px, 66% 18px, 75% 5px, 84% 23px, 92% 1px, 100% 14px,
+    100% calc(100% - 20px), 93% calc(100% - 3px), 85% calc(100% - 24px), 76% calc(100% - 8px), 66% calc(100% - 22px), 57% 100%, 47% calc(100% - 18px), 36% calc(100% - 4px), 27% calc(100% - 25px), 17% calc(100% - 7px), 8% calc(100% - 22px), 0 calc(100% - 10px));
+}
+.about-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 3rem 4rem; }
+.about-head { position: sticky; top: 2rem; align-self: start; }
+h2 { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: clamp(1.6rem, 3.6vw, 2.6rem); line-height: 1.12; text-wrap: balance; overflow-wrap: break-word; }
+.about-head p { margin: 1.25rem 0 0; max-width: 38ch; color: var(--dim); }
+.feat { display: grid; grid-template-columns: minmax(0, 12rem) minmax(0, 1fr); gap: .4rem 2rem; padding-block: 1.6rem; border-top: 1px solid var(--line); }
+.feat:last-child { border-bottom: 1px solid var(--line); }
+.feat code { font-family: var(--f-mono); font-size: .82rem; line-height: 1.5; color: var(--green); overflow-wrap: anywhere; }
+.feat h3 { margin: 0 0 .35rem; font-size: 1.12rem; font-weight: 600; }
+.feat p { margin: 0; color: var(--dim); max-width: 52ch; }
+.feat.soon code, .feat.soon h3 { opacity: .55; }
+
+/* ---------- terminal ---------- */
+.session { padding-block: 5.5rem 4rem; }
+.session-head { max-width: 40rem; margin-bottom: 2.5rem; }
+.session-head p { margin: 1rem 0 0; color: var(--dim); }
+.term { max-width: 860px; border: 1px solid var(--green-deep); background: rgba(3, 8, 5, .94); font-family: var(--f-mono); font-size: .95rem; line-height: 1.7; }
+.term-bar { display: flex; align-items: center; gap: .5rem; padding: .55rem .9rem; border-bottom: 1px solid var(--line); font-size: .74rem; letter-spacing: .08em; color: var(--dim); }
+.term-bar i { width: 9px; height: 9px; background: var(--green-deep); }
+.term-bar span { margin-left: auto; }
+.term-body { padding: 1.1rem 1.2rem 1.3rem; }
+.ln { white-space: pre-wrap; overflow-wrap: anywhere; }
+.p { color: var(--green); }
+.snd { color: #6ea8ff; }
+.ok { color: var(--green); }
+.st { color: #e7d35c; }
+.typed { display: inline-block; overflow: hidden; white-space: nowrap; vertical-align: bottom; width: calc(var(--n) * 1ch); }
+.term.armed .ln { opacity: 0; transform: translateY(6px); }
+.term.armed .ln.on { opacity: 1; transform: none; transition: opacity .25s, transform .25s; }
+.term.armed .ln.on .typed { animation: typing calc(var(--n) * 38ms) steps(var(--n)) both; }
+@keyframes typing { from { width: 0; } }
+.caret { display: inline-block; width: .6em; height: 1.05em; margin-left: .15em; vertical-align: text-bottom; background: var(--green); animation: blink 1s steps(1) infinite; }
+
+/* ---------- download ---------- */
+.get { padding-block: 5rem 6rem; }
+.get-h { font-size: clamp(2rem, 7vw, 5rem); line-height: 1.02; max-width: 14ch; text-transform: uppercase; font-weight: 900; }
+.get-h span { color: transparent; -webkit-text-stroke: 1.5px var(--green); }
+.get-box { display: flex; flex-wrap: wrap; align-items: center; gap: 1.25rem 2.5rem; margin-top: 2.5rem; padding: 1.75rem; border: 1px solid var(--green-deep); background: rgba(6, 14, 9, .92); }
+.get-meta { display: flex; flex-direction: column; gap: .4rem; min-width: 0; font-family: var(--f-mono); font-size: .86rem; }
+.get-meta #ver { color: var(--ink); overflow-wrap: anywhere; }
+.steps { list-style: none; margin: 3rem 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem 2rem; counter-reset: s; }
+.steps li { counter-increment: s; padding-top: 1rem; border-top: 1px solid var(--line); color: var(--dim); }
+.steps li::before { content: counter(s, decimal-leading-zero); display: block; margin-bottom: .5rem; font-family: var(--f-mono); font-weight: 700; color: var(--green); }
+.steps b { color: var(--ink); font-weight: 600; }
+.note { margin: 2rem 0 0; max-width: 62ch; font-size: .9rem; color: var(--dim); }
+
+footer { padding-block: 2rem calc(2.5rem + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); background: rgba(4, 8, 5, .92); font-family: var(--f-mono); font-size: .8rem; color: var(--dim); }
+footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem 2rem; }
+footer a { text-decoration: none; }
+footer a:hover { color: var(--green); }
+
+/* ---------- scroll-driven reveal ---------- */
+@supports (animation-timeline: view()) {
+  .rv { animation: rise linear both; animation-timeline: view(); animation-range: entry 0% entry 55%; }
+}
+@keyframes rise { from { opacity: .25; transform: translateY(56px); } }
+
+@media (max-width: 860px) {
+  .about-grid { grid-template-columns: minmax(0, 1fr); }
+  .about-head { position: static; }
+  .hero-foot { grid-template-columns: minmax(0, 1fr); }
+  .steps { grid-template-columns: minmax(0, 1fr); }
+  .slab { padding-block: 5.5rem; }
+}
+@media (max-width: 560px) {
+  .feat { grid-template-columns: minmax(0, 1fr); }
+  .get-box { padding: 1.25rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .r1, .r2 { transform: none; }
+  .ch::before, .ch::after { display: none; }
+}
+</style>
+
+<canvas id="rain" aria-hidden="true"></canvas>
+<div class="scan" aria-hidden="true"></div>
+<div class="prog" aria-hidden="true"><i id="sp"></i></div>
+
+<div class="page">
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="bar">
+      <span><b>■</b> t3roll / trolling</span>
+      <nav>
+        <a href="#about">О проекте</a>
+        <a href="#session">Пример</a>
+        <a href="#get">Скачать</a>
+        <a href="https://github.com/TeroBsass/osint_master" rel="noopener">GitHub</a>
+      </nav>
+    </div>
+
+    <h1 class="title" aria-label="Trolling">
+      <span class="row r1" aria-hidden="true">
+        <span class="ch" style="--i:0" data-c="T">T</span><span class="ch" style="--i:1" data-c="R">R</span><span class="ch" style="--i:2" data-c="O">O</span><span class="ch" style="--i:3" data-c="L">L</span><span class="ch" style="--i:4" data-c="L">L</span>
+      </span>
+      <span class="row r2" aria-hidden="true">
+        <span class="ch" style="--i:5" data-c="I">I</span><span class="ch" style="--i:6" data-c="N">N</span><span class="ch" style="--i:7" data-c="G">G</span><i class="cur"></i>
+      </span>
+    </h1>
+
+    <div class="hero-foot">
+      <p class="lead">
+        <span class="tag">Консольный мессенджер для Windows</span>
+        Пишешь командой, читаешь в терминале. Переписка стирается сама.
+      </p>
+      <div class="cta">
+        <a class="btn" id="dl-hero" href="https://github.com/TeroBsass/trolling/releases/latest/download/MarkSetup.exe" rel="noopener">
+          Скачать для Windows
+          <small>MarkSetup.exe, последний релиз</small>
+        </a>
+        <a class="lnk" href="https://github.com/TeroBsass/trolling/releases/latest" rel="noopener">Все релизы на GitHub</a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section class="tapes" aria-hidden="true">
+  <div class="tape t1"><div class="track">
+    <span>Написал → Прочитано → Стёрто → Написал → Прочитано → Стёрто → Написал → Прочитано → Стёрто → Написал → Прочитано → Стёрто →&nbsp;</span>
+    <span>Написал → Прочитано → Стёрто → Написал → Прочитано → Стёрто → Написал → Прочитано → Стёрто → Написал → Прочитано → Стёрто →&nbsp;</span>
+  </div></div>
+  <div class="tape t2"><div class="track">
+    <span>hwid → device_token → 200 OK → hwid → device_token → 200 OK → hwid → device_token → 200 OK → hwid → device_token → 200 OK →&nbsp;</span>
+    <span>hwid → device_token → 200 OK → hwid → device_token → 200 OK → hwid → device_token → 200 OK → hwid → device_token → 200 OK →&nbsp;</span>
+  </div></div>
+</section>
+
+<section class="slab" id="about">
+  <div class="wrap about-grid">
+    <div class="about-head rv">
+      <p class="eyebrow">О проекте</p>
+      <h2>Веселый инструмент, который живёт в терминале.</h2>
+      <p>Без окон, аватарок и истории на века. Клиент ставится одним установщиком, а команды помещаются в одну строку.</p>
+    </div>
+    <div class="about-list">
+      <div class="feat rv">
+        <code>--name<br>--mes<br>--act</code>
+        <div><h3>Пишешь командой</h3><p>Имя получателя и текст передаются флагами или постепенным вводом. Никаких меню, всё в одной строке.</p></div>
+      </div>
+      <div class="feat rv">
+        <code>--names=(bob,alice)</code>
+        <div><h3>Рассылка за один раз</h3><p>Один текст сразу нескольким людям. Если кого-то нет в базе, клиент назовёт, кого именно. Писать самому себе нельзя.</p></div>
+      </div>
+      <div class="feat rv">
+        <code>auto-delete</code>
+        <div><h3>Сообщения не копятся</h3><p>Переписка хранится на сервере недолго и стирается автоматически.</p></div>
+      </div>
+      <div class="feat rv">
+        <code>device_token</code>
+        <div><h3>Вход по ключу устройства</h3><p>При первом запуске вводишь имя и пароль. Дальше клиент узнаёт тебя сам. Если локальный ключ потерян, доступ возвращается входом по имени и паролю на том же устройстве.</p></div>
+      </div>
+      <div class="feat rv">
+        <code>MarkSetup.exe</code>
+        <div><h3>Ставится одним файлом</h3><p>Установщик для Windows. Скачал, запустил, пользуешься.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="session" id="session">
+  <div class="wrap">
+    <div class="session-head rv">
+      <p class="eyebrow">Пример сеанса</p>
+      <h2>Так выглядит чат.</h2>
+      <p>Вывод клиента, как он идёт в консоли. Имена и текст придуманы для примера.</p>
+    </div>
+    <div class="term rv" id="term" role="img" aria-label="Пример сеанса в консоли: новые сообщения от bob и ответ ему">
+      <div class="term-bar"><i></i><i></i><i></i><span>trolling, пример</span></div>
+      <div class="term-body">
+        <div class="ln"><span class="p">&gt;</span> <span class="typed" style="--n:4">chat my</span></div>
+        <div class="ln snd">WARNING: There are new messages for you.</div>
+        <div class="ln ok">Your messages:</div>
+        <div class="ln"><span class="snd">bob</span>&gt;&gt;ты где?</div>
+        <div class="ln"><span class="snd">bob</span>&gt;&gt;созвон через пять минут</div>
+        <div class="ln st">All messages displayed and read.</div>
+        <div class="ln"><span class="p">&gt;</span> <span class="typed" style="--n:28">send --name bob --mes "иду"</span></div>
+        <div class="ln ok">Message sent successfully.</div>
+        <div class="ln"><span class="p">&gt;</span> <span class="typed" style="--n:4">dos --name=bob --act=shutdown</span></div>
+        <div class="ln st">The user bob was acting to shutdown.</div>
+        <div class="ln"><span class="p">&gt;</span><span class="caret"></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slab get" id="get">
+  <div class="wrap">
+    <p class="eyebrow rv">Релиз</p>
+    <h2 class="get-h rv">Скачать <span>свежую</span> версию</h2>
+    <div class="get-box rv">
+      <a class="btn" id="dl" href="https://github.com/TeroBsass/trolling/releases/latest/download/MarkSetup.exe" rel="noopener">
+        Скачать для Windows
+        <small class="fn">MarkSetup.exe</small>
+      </a>
+      <div class="get-meta">
+        <span id="ver">Ссылка всегда ведёт на последний релиз.</span>
+        <a class="lnk" href="https://github.com/TeroBsass/trolling/releases/latest" rel="noopener">Все релизы и список изменений</a>
+      </div>
+    </div>
+    <ol class="steps">
+      <li class="rv"><b>Скачай установщик.</b> Кнопка выше берёт файл из последнего релиза на GitHub.</li>
+      <li class="rv"><b>Запусти MarkSetup.exe.</b> Дождись конца установки.</li>
+      <li class="rv"><b>Открой клиент.</b> При первом запуске введи имя и пароль.</li>
+    </ol>
+    <p class="note rv">Установщик не подписан сертификатом, поэтому Windows SmartScreen может попросить подтвердить запуск.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>TROLLING · TeroBsass · <span id="yr">2026</span></span>
+    <a href="https://github.com/TeroBsass/trolling" rel="noopener">github.com/TeroBsass/osint_master</a>
+  </div>
+</footer>
+
+</div>
+
+<script>
+(function () {
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var hero = document.getElementById('top');
+  var sp = document.getElementById('sp');
+  var boost = 0, lastY = window.scrollY || 0, ticking = false;
+
+  try { document.getElementById('yr').textContent = new Date().getFullYear(); } catch (e) {}
+
+  /* scroll: title rows slide apart, progress bar, rain speed */
+  function onScroll() {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(function () {
+      var y = window.scrollY || 0;
+      var max = document.documentElement.scrollHeight - window.innerHeight;
+      sp.style.width = (max > 0 ? (y / max) * 100 : 0) + '%';
+      if (!reduce) {
+        hero.style.setProperty('--p', Math.min(1.6, y / Math.max(1, hero.offsetHeight * 0.9)).toFixed(3));
+        boost = Math.min(8, boost + Math.abs(y - lastY) * 0.08);
+      }
+      lastY = y;
+      ticking = false;
+    });
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  /* background rain of hex bytes and protocol glyphs */
+  var cv = document.getElementById('rain');
+  var ctx = cv.getContext && cv.getContext('2d');
+  if (ctx) {
+    var FS = 15, CH = '0123456789abcdef0123456789abcdef->;:#';
+    var W, H, dpr, cols = [], tear = null;
+    var resize = function () {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = window.innerWidth; H = window.innerHeight;
+      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = '#040805'; ctx.fillRect(0, 0, W, H);
+      ctx.font = '700 ' + FS + 'px "JetBrains Mono", Consolas, monospace';
+      ctx.textBaseline = 'top';
+      var gap = FS * 1.7, n = Math.ceil(W / gap);
+      cols = [];
+      for (var i = 0; i < n; i++) {
+        var y = Math.random() * H;
+        cols.push({ x: i * gap, y: y, drawn: y, v: 0.5 + Math.random() * 1.6 });
+      }
+    };
+    var step = function (now) {
+      ctx.fillStyle = 'rgba(4,8,5,.09)';
+      ctx.fillRect(0, 0, W, H);
+      var k = 1 + boost;
+      for (var i = 0; i < cols.length; i++) {
+        var c = cols[i];
+        c.y += c.v * k;
+        while (c.drawn < c.y) {
+          ctx.fillStyle = Math.random() < 0.04 ? '#eafff1' : '#34ff7e';
+          ctx.fillText(CH.charAt(Math.floor(Math.random() * CH.length)), c.x, c.drawn);
+          c.drawn += FS;
+        }
+        if (c.y > H + 40 + Math.random() * 400) { c.y = -Math.random() * H * 0.5; c.drawn = c.y; c.v = 0.5 + Math.random() * 1.6; }
+      }
+      boost *= 0.92;
+      if (tear && now < tear.until) {
+        ctx.drawImage(cv, 0, Math.round(tear.y * dpr), cv.width, Math.round(tear.h * dpr), tear.dx, tear.y, W, tear.h);
+      } else { tear = null; }
+    };
+    resize();
+    window.addEventListener('resize', resize);
+    if (reduce) {
+      for (var f = 0; f < 140; f++) step(0);
+    } else {
+      var loop = function (now) { step(now); requestAnimationFrame(loop); };
+      requestAnimationFrame(loop);
+      var schedule = function () {
+        setTimeout(function () {
+          tear = { y: Math.random() * H * 0.8, h: 20 + Math.random() * 90, dx: (Math.random() < 0.5 ? -1 : 1) * (10 + Math.random() * 50), until: performance.now() + 160 };
+          schedule();
+        }, 2500 + Math.random() * 4500);
+      };
+      schedule();
+    }
+  }
+
+  /* terminal: type the session once it scrolls into view */
+  var term = document.getElementById('term');
+  if (term && 'IntersectionObserver' in window && !reduce) {
+    var io = new IntersectionObserver(function (es) {
+      if (!es[0].isIntersecting) return;
+      io.disconnect();
+      var lines = [].slice.call(term.querySelectorAll('.ln'));
+      term.classList.add('armed');
+      var t = 200;
+      lines.forEach(function (l) {
+        var typed = l.querySelector('.typed');
+        var n = typed ? parseInt(typed.style.getPropertyValue('--n'), 10) || 0 : 0;
+        setTimeout(function () { l.classList.add('on'); }, t);
+        t += typed ? n * 38 + 500 : 520;
+      });
+    }, { threshold: 0.35 });
+    io.observe(term);
+  }
+
+  /* latest release details; works when the page can reach the GitHub API */
+  try {
+    var dl = document.getElementById('dl'), dlh = document.getElementById('dl-hero'), ver = document.getElementById('ver');
+    var ac = new AbortController();
+    setTimeout(function () { ac.abort(); }, 6000);
+    fetch('https://api.github.com/repos/TeroBsass/osint_master/releases/latest', { signal: ac.signal, headers: { Accept: 'application/vnd.github+json' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d) return;
+        var a = (d.assets || []).filter(function (x) { return /\.exe$/i.test(x.name); })[0];
+        if (a) {
+          dl.href = a.browser_download_url; dlh.href = a.browser_download_url;
+          dl.querySelector('.fn').textContent = a.name;
+        }
+        var parts = [d.tag_name];
+        if (d.published_at) parts.push(new Date(d.published_at).toLocaleDateString('ru-RU'));
+        if (a) parts.push((a.size / 1048576).toFixed(0) + ' МБ');
+        ver.textContent = parts.join(' · ');
+      })
+      .catch(function () {});
+  } catch (e) {}
+})();
+</script>
